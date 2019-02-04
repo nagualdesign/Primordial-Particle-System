@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Primordial Particle System</title>
+  <meta name="description" content="Based on the YouTube video, 'How life emerges from a simple particle motion law: Introducing the Primordial Particle System': https://www.youtube.com/watch?v=makaJpLvbow" />
+  <meta name="author" content="nagualdesign" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <link href="https://fonts.googleapis.com/css?family=Roboto:300" rel="stylesheet">
+  <script>
+    // For more information visit: https://www.youtube.com/watch?v=makaJpLvbow
+    // This video focuses primarily on specific values of alpha, beta, v and r
+    // It goes on to show the effects of altering the values of alpha and beta
+
+    // Here you can also explore various values of gamma, the ratio of v and r
+    //      Gamma = radius of neighbourhoods (r) / speed of particles (v)
+    
+    // Particle behaviour is only dependent on values of alpha, beta and gamma
+    // The simulation is scale invariant and works the same at any screen size
+    // You can also increase or decrease particle density by zooming in or out
+    
+    const pi=Math.PI, tau=2*pi;
+    
+    // Randomize alpha, beta and gamma
+    var a=Math.round(Math.random()*360)-180;  // Alpha (-180° to +180°)
+    var b=Math.round(Math.random()*120)-60;   // Beta (-60° to +60°)
+    var g=Math.round(5/Math.random());        // Gamma (5 to 500)
+    
+    // User defined variables
+    var n=1000;  // Number of particles
+    var t=20;    // Interval between frames in milliseconds
+    
+    // Some interesting values to try out
+    // a=180, b=17, g=7.5   // Values from original paper
+    // a=92, b=-15, g=8;    // Internal contrarotation
+    // a=5, b=31, g=6;      // Sprites (view at 50% zoom)
+    // a=-122, b=-6, g=-9;  // Cell growth
+    // a=-23, b=2, g=6;     // Donuts (view at 110% zoom)
+    // a=114, b=-4, g=6;    // Goblins
+    // a=173, b=-8, g=5;    // Puff balls
+    // a=22, b=-29, g=8;    // Lava lamp
+    // a=-1, b=51, g=6;     // Primordial soup
+    // a=174, b=15, g=5;    // Thick cell walls
+    // a=-90, b=-90, g=3;   // Polycrystalline (view at 50%)
+    // a=-20, b=-25, g=7;   // Gradual evolution
+    // a=, b=, g=;  // Remember to add a description!
+    // a=, b=, g=;  // Remember to add a description!
+    
+    // Convert to radians
+    a=(a/360)*tau, b=(b/360)*tau;
+    
+    var canvas, context;      // HTML canvas
+    var p=new Array(n);       // Particles
+    var w,h,z,s,s2,r,r2,v,o;  // These values are calculated automatically
+    var running=false;        // Allows you to play/pause the simulation
+    
+    function init() {
+      w=window.innerWidth, h=window.innerHeight;     // Screen dimensions
+      z=Math.round(((window.outerWidth-8)/w)*20)*5;  // Zoom level
+      
+      // Setup canvas
+      canvas=document.getElementById("canvas");
+      context=canvas.getContext("2d");
+      canvas.width=w; canvas.height=h;
+      
+      // Set particle properties
+      s=5, s2=s*2;                                             // Size of particles
+      r=Math.round((Math.sqrt((w*h)/n))*0.16*z)/100, r2=r*s2;  // Radius of neighbourhoods
+      v=Math.round((r/g)*100)/100;                             // Speed of particles
+      o=0.5;                                                   // Lower values leave longer trails
+      
+      // Randomize position and orientation of particles
+      for (i=0; i<n; i++) {
+        p[i]=new Array(6);          // Each particle has 6 variables
+        p[i][0]=Math.random()*w;    // Set random x coordinate
+        p[i][1]=Math.random()*h;    // Set random y coordinate
+        p[i][2]=Math.random()*tau;  // Set random orientation
+        p[i][3]=0;                  // Number of neighbours
+        p[i][4]=0;                  // Neighbours on left
+        p[i][5]=0;                  // Neighbours on right
+      }
+      
+      // Display current settings
+      let sHTML='α&thinsp;'+Math.round((a/pi)*180)+'°&emsp;β&thinsp;'+Math.round((b/pi)*180)+'°&emsp;γ&thinsp;'+g;
+      // sHTML+='&emsp;zoom='+z+'%&emsp;r='+r+'&emsp;v='+v;  // Display current neighbourhood radius and particle speed
+      document.getElementById("settings").innerHTML=sHTML;
+      
+      // Begin simulation
+      playPause();
+    }
+    
+    function scope(val,max) {
+      // Ensure values are between 0 and max
+      if (val>max) val=val%max;
+      else if (val<0) val=max+(val%max);
+      return val;
+    }
+    
+    function loop() {
+      for (i=0; i<n; i++) {                               // Compare every particle...
+        for (j=i+1; j<n; j++) {                           // ...to every other particle
+          let sX=p[j][0]-p[i][0];                         // Calculate x-axis separation
+          if (Math.abs(sX)<r2) {                          // Only if x-axis separation is less than r
+            let sY=p[j][1]-p[i][1];                       // Calculate y-axis separation
+            if (Math.abs(sY)<r2) {                        // Only if y-axis separation is also less than r
+              let sD=(sX*sX)+(sY*sY);                     // Calculate the square of the separation distance
+              if (sD<(r2*r2)) {                           // Only if separation distance is also less than r
+                p[i][3]++; p[j][3]++;                     // Increase total neighbour counts
+                let sA=scope(Math.atan2(sY,sX),tau);      // Calculate separation angle using trigonometry
+                if (scope(sA-p[i][2],tau)<pi) p[i][5]++;  // Particle j is to the right of i
+                else p[i][4]++;                           // Particle j is to the left of i
+                if (scope(sA-p[j][2],tau)>pi) p[j][5]++;  // Particle i is to the right of j
+                else p[j][4]++;                           // Particle i is to the left of j
+              }
+            }
+          }
+        }
+        
+        // delta_phi = alpha + beta × N × sign(R - L)
+        let deltaPhi=a+(b*p[i][3]*Math.sign(p[i][5]-p[i][4]));
+        
+        // Turn right delta_phi
+        p[i][2]=scope(p[i][2]+deltaPhi,tau);
+      }
+      
+      // Clear canvas
+      context.fillStyle='rgba(0,0,0,'+o+')';
+      context.fillRect(0,0,w,h);
+      
+      for (i=0; i<n; i++) {
+        // Select hue based on number of neighbours
+        let fc='hsl('+((p[i][3]*7)+90)+',100%,50%)';
+        
+        // Reset values of N, L and R
+        p[i][3]=0, p[i][4]=0, p[i][5]=0;
+        
+        // Move forward v
+        p[i][0]+=(v*s2*Math.cos(p[i][2]));  // X coordinate
+        p[i][1]+=(v*s2*Math.sin(p[i][2]));  // Y coordinate
+        
+        // Wrap screen edges, Pac-Man style
+        p[i][0]=scope(p[i][0]+s2,canvas.width+(s2*2))-s2;   // X coordinate
+        p[i][1]=scope(p[i][1]+s2,canvas.height+(s2*2))-s2;  // Y coordinate
+        
+        // Draw circles on canvas
+        context.beginPath();
+        context.arc(p[i][0],p[i][1],r,0,tau);
+        context.fillStyle=fc;
+        context.fill();
+        context.closePath();
+      }
+    }
+    
+    function playPause() {
+      if (!running) {
+        // Play simulation
+        running=true;
+        run=setInterval(loop,t);
+      } else {
+        // Pause simulation
+        running=false;
+        window.clearTimeout(run);
+      }
+    }
+    
+    function restart() {
+      // Restart simulation
+      running=false;
+      window.clearTimeout(run);
+      init();
+    }
+  </script>
+</head>
+<body style="margin:0; background:#000; overflow:hidden;" onLoad="init();" onResize="restart();">
+  <canvas id="canvas" onClick="playPause();"></canvas>
+  <div id="settings" style="font:200 3vmin Roboto; color:#AAA; padding:3vmin; cursor:pointer; position:absolute; bottom:0vmin; left:0vmin; z-index:2;" onClick="location.reload();"></div>
+</body>
+</html>
