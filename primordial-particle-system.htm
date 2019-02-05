@@ -40,12 +40,12 @@
     var preset=[[180,17,0.134,'Values from original paper',n,d,s,o,f],
       [92,-15,0.125,'Internal contrarotation',1000,d,s,0.6,f],
       [5,31,0.166,'Sprites',n,0.5,s,0.1,f],
-      [-122,-6,0.111,'Cell growth',1000,d,s,o,f],
+      // [-122,-6,0.111,'Cell growth',1000,d,s,o,f],
       [-23,2,0.166,'Donuts',n,2.5,s,0.6,f],
-      [114,-4,0.166,'Goblins',n,d,s,0.6,f],
+      [114,-4,0.166,'Goblins',800,d,s,0.6,f],
       [173,-8,0.200,'Puff balls',1000,d,s,0.6,f],
       [22,-29,0.125,'Lava lamp',400,d,s,0.1,f],
-      [-1,51,0.166,'Primordial soup',1000,d,s,0.4,f],
+      // [-1,51,0.166,'Primordial soup',1000,d,s,0.4,f],
       [174,15,0.200,'Thick cell walls',1000,2.5,s,0.6,f],
       [-90,-90,0.333,'Liquid crystal',n,0.5,s,0.1,f],
       [-20,-25,0.143,'Gradual evolution',1000,d,s,0.6,f],
@@ -93,10 +93,13 @@
       document.getElementById("beta").value=b;
       document.getElementById("gamma").value=g;
       document.getElementById("number").value=n;
+      document.getElementById("num").innerHTML=n;
       document.getElementById("density").value=d;
+      document.getElementById("den").innerHTML=d;
       document.getElementById("size").value=s;
       document.getElementById("trails").value=1-o;
       document.getElementById("framerate").value=f;
+      document.getElementById("rate").innerHTML=f;
       
       // Convert to radians
       a=(a/360)*tau, b=(b/360)*tau;
@@ -255,7 +258,7 @@
       if (!paused) playPause();
       count=0, elapsed=0;
       scale();
-      
+      document.getElementById("den").innerHTML=Math.round(d*z*z*100);  // Zooming affects density
       setvr();
       populate(dist);
       playPause();
@@ -287,11 +290,11 @@
       if (id=='alpha') a=(value/180)*pi;
       else if (id=='beta') b=(value/180)*pi;
       else if (id=='gamma') { g=value, v=g*r; }
-      else if (id=='number') { n=value; setvr(); }
-      else if (id=='density') { d=value; scale; setvr(); }
+      else if (id=='number') { n=value; setvr(); document.getElementById("num").innerHTML=n; }
+      else if (id=='density') { d=value; scale; setvr(); document.getElementById("den").innerHTML=Math.round(d*z*z*100); }
       else if (id=='trails') o=1-value;
       else if (id=='size') s=value, sr=s*r, sr2=sr*2, sr4=sr*4, srdpr=sr*dpr;
-      else if (id=='framerate') f=value;
+      else if (id=='framerate') { f=value; document.getElementById("rate").innerHTML=f; }
       if ((id=='alpha') || (id=='beta') || (id=='gamma')) { label=''; showabg(); }
       if ((paused) && (id!='framerate')) step();
       else if ((id=='framerate') && (!paused)) { window.clearTimeout(run); run=setInterval(step,1000/f); }
@@ -303,15 +306,15 @@
     body { background:#000; font-family:Roboto; font-weight:200; text-shadow:0 0.2vmin 0.3vmin #000; overflow:hidden; }
     #settings { cursor:pointer; font-size:3vmin; color:#AAA; padding:3vmin; position:fixed; bottom:0vmin; left:0vmin; z-index:2; }
     #label { color:#666; }
-    #controls { width:45.15vh; height:100vh; background:rgba(48,48,48,0.9); padding:4.5vh 1vh; border-left:0.1vh solid #000; text-align:center; position:absolute; top:0; right:-45vh; z-index:2; transition:right 0.25s; }
+    #controls { padding:4.5vh 0 1.5vh 0; width:45.15vh; height:100vh; background:rgba(48,48,48,0.9); border-left:0.1vh solid #000; text-align:center; position:absolute; top:0; right:-45vh; z-index:2; transition:right 0.25s; }
     #controls:hover { right:0 !important; }
     #controls h1 { font-size:3vh; font-weight:normal; color:#FFF; line-height:1; }
     #controls h2 { margin:2.5vh 0 1vh 0; font-size:2.5vh; font-weight:normal; color:#FFF; }
     #controls p { margin-bottom:3vmin; font-size:1.8vh; color:#CCC; line-height:1.5; }
     #controls p a { color:#EEE; text-decoration:none; }
     #controls p a:hover { color:#FFF; }
-    input[type=range] { margin:0.75vh 0; width:34vh; height:2vh; background:transparent; }
-    input[type=button] { margin:0.5vh 0; width:16vh; height:3vh; }
+    input[type=range] { margin:0.75vh 0; width:34vh; height:2vh; }
+    input[type=button] { margin:0.5vh 0; width:16vh; height:3vh; font-size:1.8vh; }
   </style>
 </head>
 <body onLoad="initialize();" onResize="refresh(0);">
@@ -332,15 +335,15 @@
       Gamma (step size)<br />
       <input id="gamma" type="range" min="0.005" max="0.5" step="0.005" onInput="change(this.id,this.value);" /></p>
     <h2>Environmental controls</h2>
-    <p>Number of particles<br />
+    <p>Number of particles (<span id="num"></span>)<br />
       <input id="number" type="range" min="200" max="10000" step="200" onInput="change(this.id,this.value);" /><br />
-      Particle density<br />
+      Particle density (<span id="den"></span>%)<br />
       <input id="density" type="range" min="0.5" max="10" step="0.5" onInput="change(this.id,this.value);" /><br />
       Particle size<br />
       <input id="size" type="range" min="0.1" max="0.5" step="0.05" onInput="change(this.id,this.value);" /><br />
       Particle trails<br />
       <input id="trails" type="range" min="0" max="0.9" step="0.01" onInput="change(this.id,this.value);" /><br />
-      Frame rate<br />
+      Frame rate (<span id="rate"></span>fps)<br />
       <input id="framerate" type="range" min="5" max="100" step="5" onInput="change(this.id,this.value);" /></p>
     <p>Redistribute<br />
       <input type="button" value="Random" onClick="refresh(0);" />&emsp;<input type="button" value="Centre" onClick="refresh(1);" /></p>
