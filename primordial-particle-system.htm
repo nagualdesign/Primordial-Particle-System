@@ -172,32 +172,48 @@
     function step() {
       count++;
       // Calculate and apply changes in orientation
-      // This method is not well optimized when dealing with many thousands of particles
-      // The total number of calculations required is roughly proportional to the square of n
-      for (i=0; i<n; i++) {                               // Compare every particle...
-        for (j=i+1; j<n; j++) {                           // ...to every other particle
-          let sX=p[j][0]-p[i][0];                         // Calculate x-axis separation
-          if (Math.abs(sX)<r) {                           // Only if x-axis separation is less than r
-            let sY=p[j][1]-p[i][1];                       // Calculate y-axis separation
-            if (Math.abs(sY)<r) {                         // Only if y-axis separation is also less than r
-              let sD=(sX*sX)+(sY*sY);                     // Calculate the square of the separation distance
-              if (sD<r2) {                                // Only if separation distance is also less than r
-                p[i][3]++, p[j][3]++;                     // Increase total neighbour counts
-                let sA=scope(Math.atan2(sY,sX),tau);      // Calculate separation angle using trigonometry
-                if (scope(sA-p[i][2],tau)<pi) p[i][5]++;  // Particle j is to the right of i
-                else p[i][4]++;                           // Particle j is to the left of i
-                if (scope(sA-p[j][2],tau)>pi) p[j][5]++;  // Particle i is to the right of j
-                else p[j][4]++;                           // Particle i is to the left of j
+      let method=1;
+      if (method==1) {
+        // This method is not well optimized when dealing with many thousands of particles
+        // The total number of calculations required is roughly proportional to the square of n
+        for (i=0; i<n; i++) {                               // Compare every particle...
+          for (j=i+1; j<n; j++) {                           // ...to every other particle
+            let sX=p[j][0]-p[i][0];                         // Calculate x-axis separation
+            if (Math.abs(sX)<r) {                           // Only if x-axis separation is less than r
+              let sY=p[j][1]-p[i][1];                       // Calculate y-axis separation
+              if (Math.abs(sY)<r) {                         // Only if y-axis separation is also less than r
+                let sD=(sX*sX)+(sY*sY);                     // Calculate the square of the separation distance
+                if (sD<r2) {                                // Only if separation distance is also less than r
+                  p[i][3]++, p[j][3]++;                     // Increase total neighbour counts
+                  let sA=scope(Math.atan2(sY,sX),tau);      // Calculate separation angle using trigonometry
+                  if (scope(sA-p[i][2],tau)<pi) p[i][5]++;  // Particle j is to the right of i
+                  else p[i][4]++;                           // Particle j is to the left of i
+                  if (scope(sA-p[j][2],tau)>pi) p[j][5]++;  // Particle i is to the right of j
+                  else p[j][4]++;                           // Particle i is to the left of j
+                }
               }
             }
           }
+          
+          // delta_phi = alpha + beta × N × sign(R - L)
+          let deltaPhi=a+(b*p[i][3]*Math.sign(p[i][5]-p[i][4]));
+          
+          // Turn right delta_phi
+          p[i][2]=scope(p[i][2]+deltaPhi,tau);
         }
-        
-        // delta_phi = alpha + beta × N × sign(R - L)
-        let deltaPhi=a+(b*p[i][3]*Math.sign(p[i][5]-p[i][4]));
-        
-        // Turn right delta_phi
-        p[i][2]=scope(p[i][2]+deltaPhi,tau);
+      } else if (method==2) {
+        // Here's where I need to code a faster, grid-based method for calculating all the changes in orientation
+        for (i=0; i<n; i++) {
+          <!-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~  // Do this -->
+          <!-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~  // Do that -->
+          <!-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~  // Do the other -->
+          
+          // delta_phi = alpha + beta × N × sign(R - L)
+          let deltaPhi=a+(b*p[i][3]*Math.sign(p[i][5]-p[i][4]));
+          
+          // Turn right delta_phi
+          p[i][2]=scope(p[i][2]+deltaPhi,tau);
+        }
       }
         
       // Clear HTML canvas
