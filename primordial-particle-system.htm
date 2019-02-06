@@ -1,339 +1,354 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <title>Primordial Particle System</title>
-  <meta name="description" content="Based on the YouTube video, 'How life emerges from a simple particle motion law: Introducing the Primordial Particle System': https://www.youtube.com/watch?v=makaJpLvbow" />
-  <meta name="author" content="nagualdesign & planet 11 games" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
-  <link href="https://fonts.googleapis.com/css?family=Roboto:300" rel="stylesheet">
-  <script>
-    // For more information visit: https://www.youtube.com/watch?v=makaJpLvbow
-    // This video focuses primarily on specific values of alpha, beta, v and r
-    // It goes on to show the effects of altering the values of alpha and beta
-    
-    // Here you can also explore various values of gamma, the ratio of v and r
-    //      Gamma = speed of particles (v) / radius of neighbourhoods (r)
-    // Note that gamma values are now the reciprocal (1/x) of previous values!
-    
-    // Particle behaviour is only dependent on values of alpha, beta and gamma
-    // The simulation is scale invariant and works the same at any screen size
-    // You can also increase or decrease particle density by zooming in or out
-    
-    // Global variables
-    const pi=Math.PI, tau=2*pi;
-    var canvas, context;
-    var p=new Array(10000);
-    var a, b, g, label, demo=1;
-    var vw, vh, z, dpr, cw, ch;
-    var r, r2, v, sr, sr2, sr4, srdrp;
-    var count, elapsed, time, fps, paused=true;
-    
-    // Default settings
-    var n=600;  // Number of particles (100 to 10,000)
-    var d=2.0;  // Particle density at 100% zoom (1.0 to 10.0)
-    var s=0.1;  // Visible radius of particles relative to r (0.01 to 1.00)
-    var o=1.0;  // Background opacity (1.0 to 0.1)
-    var f=25;   // Maximum frames rate (10 to 100)
-    
-    // Preset values of alpha, beta and gamma
-    var preset=[[180,17,0.134,'Values from original paper',n,d,s,o,f],
-      [92,-15,0.125,'Internal contrarotation',1000,d,s,0.6,f],
-      [5,31,0.166,'Sprites',n,0.5,s,0.1,f],
-      // [-122,-6,0.111,'Cell growth',1000,d,s,o,f],
-      [-23,2,0.166,'Donuts',n,2.5,s,0.6,f],
-      [114,-4,0.166,'Goblins',800,d,s,0.4,f],
-      [173,-8,0.200,'Puff balls',1000,d,s,0.1,f],
-      [22,-29,0.125,'Lava lamp',400,d,s,0.1,f],
-      // [-1,51,0.166,'Primordial soup',1000,d,s,0.4,f],
-      [174,15,0.200,'Thick cell walls',1000,2.5,s,0.6,f],
-      [-90,-90,0.333,'Liquid crystal',n,0.5,s,0.1,f],
-      [-20,-25,0.143,'Gradual evolution',1000,d,s,0.6,f],
-      [146,8,0.125,'Thermophiles',1000,6,s,0.6,f],
-      [117,-4,0.143,'Amoebas merging and evolving',1000,4.5,s,0.6,f]];
-    
-    // Demonstrate species presets
-    function next() {
-      let total=preset.length;
-      if (demo<total) {
-        // Cycle through presets
-        species(demo);
-        demo++;
-      } else if (demo==total) {
-        // Random species, default environment
-        n=600, d=2.0, s=0.1, o=0.6, f=25;
-        species();
-        demo++;
-      } else {
-        // Randomize species values
-        species();
-      }
-      refresh(0);
-    }
-    
-    // Set values of alpha, beta and gamma
-    function species(abg) {
-      label='';
-      if (arguments.length==0) {
-        // Randomize values (360 × 120 × 100 = 4,320,000 possible values!)
-        a=Math.round(Math.random()*360)-180;  // Alpha (-180° to +180°)
-        b=Math.round(Math.random()*120)-60;   // Beta (-60° to +60°)
-        g=Math.ceil(Math.random()*100)/500;   // Gamma (0.002 to 0.200)
-      } else if (arguments.length==1) {
-        // Use preset values
-        a=preset[abg][0], b=preset[abg][1], g=preset[abg][2], label=preset[abg][3];
-        n=preset[abg][4], d=preset[abg][5], s=preset[abg][6], o=preset[abg][7], f=preset[abg][8];
-      } else {
-        // Use selected values
-        a=arguments[0], b=arguments[1], g=arguments[2];
-      }
-      
-      // Apply settings to control sliders
-      document.getElementById("alpha").value=a;
-      document.getElementById("beta").value=b;
-      document.getElementById("gamma").value=g;
-      document.getElementById("number").value=n;
-      document.getElementById("num").innerHTML=n;
-      document.getElementById("density").value=d;
-      document.getElementById("den").innerHTML=d;
-      document.getElementById("size").value=s;
-      document.getElementById("trails").value=1-o;
-      document.getElementById("framerate").value=f;
-      document.getElementById("rate").innerHTML=f;
-      
-      // Convert to radians
-      a=(a/360)*tau, b=(b/360)*tau;
-      
-      // Display alpha, beta and gamma
-      showabg();
-    }
-    
-    // Set scale of viewport, canvas and particles
-    function scale() {
-      // Screen dimensions
-      vw=window.innerWidth, vh=window.innerHeight;     // Viewport dimensions (CSS pixels)
-      z=Math.round(((window.outerWidth-8)/vw)*20)/20;  // Browser zoom level (desktop)
-      dpr=Math.round(window.devicePixelRatio*20)/20;   // Device Pixel Ratio (mobile)
-      cw=(vw*dpr), ch=(vh*dpr);                        // HTML canvas dimensions
-      
-      // Set display size (CSS pixels)
-      canvas.style.width=vw+'px';
-      canvas.style.height=vh+'px';
-      
-      // Set actual size in memory (scaled to DPR)
-      canvas.width=cw;
-      canvas.height=ch;
-      
-      // Normalize coordinate system to use CSS pixels
-      context.scale(dpr,dpr);
-      
-      // console.log('Viewport: vw='+vw+' vh='+vh+'\nScaling: z='+z+' dpr='+dpr+'\nCanvas: cw='+cw+' ch='+ch);
-    }
-    
-    // Calculate r and v based on viewport dimensions, density and gamma
-    function setvr() {
-      let pff=2;                                      // Phantom Fudge Factor (WTF!?)
-      r=pff*Math.sqrt((vw*vh*z*z*d)/(n*pi)), r2=r*r;  // Radius of neighbourhoods (r)
-      v=g*r;                                          // Speed of particles
-      sr=s*r, sr2=sr*2, sr4=sr*4, srdpr=sr*dpr;       // Scale visible size of particles
-      
-      // console.log('r='+r+'\nv='+v);
-    }
+<meta charset="utf-8" />
+<title>Primordial Particle System</title>
+<meta name="description" content="Based on the YouTube video, 'How life emerges from a simple particle motion law: Introducing the Primordial Particle System'" />
+<meta name="author" content="nagualdesign & planet 11 games" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+<link href="https://fonts.googleapis.com/css?family=Roboto:300" rel="stylesheet">
 
-    // Create particles and place within environment
-    function populate(dist) {
-      // Randomize position and orientation of particles
-      for (i=0; i<10000; i++) {
-        p[i]=new Array(6);  // Each particle has 6 variables
-        if (dist==0) {
-          // Set uniform distribution
-          p[i][0]=Math.random()*vw;  // Set random x coordinate
-          p[i][1]=Math.random()*vh;  // Set random y coordinate
-        } else if (dist==1) {
-          // Set centre-weighted distribution
-          let mx=Math.max(0,(vw-vh)/2), my=Math.max(0,(vh-vw)/2), min=Math.min(vw,vh);
-          p[i][0]=mx+((Math.random()+Math.random()+Math.random())/3)*min;  // Set random x coordinate
-          p[i][1]=my+((Math.random()+Math.random()+Math.random())/3)*min;  // Set random y coordinate
-        }
-        p[i][2]=Math.random()*tau;  // Set random orientation (phi)
-        p[i][3]=0;                  // Number of neighbours
-        p[i][4]=0;                  // Neighbours on left
-        p[i][5]=0;                  // Neighbours on right
-      }
+<script>
+// For more information visit: https://www.youtube.com/watch?v=makaJpLvbow
+// This video focuses primarily on specific values of alpha, beta, v and r
+// It goes on to show the effects of altering the values of alpha and beta
+// Here you can also explore various values of gamma, the ratio of v and r
+//    Gamma = speed of particles (v) / radius of neighbourhoods (r)
+// Particle behaviour is only dependent on values of alpha, beta and gamma
+// Any particular combination of alpha, beta and gamma is called a species
+// Differences in particle density will affect a species overall behaviour
+// The simulation is scale invariant and works the same at any screen size
+// You can also increase or decrease particle density by zooming in or out
+
+// Global variables
+const pi=Math.PI, tau=2*pi;         // Used extensively
+var canvas, context;                // HTML canvas DOM elements
+var p=new Array(10000);             // Particle parameters
+var a, b, g, label, demo=1;         // Species parameters
+var vw, vh, z, dpr, cw, ch;         // Viewport and canvas dimensions
+var r, r2, v, sr, sr2, sr4, srdrp;  // Used extensively
+var count, elapsed, time, fps;      // Stopwatch parameters
+var dist=0, paused=true;            // Simulation parameters
+
+// Default settings
+var n=600;  // Number of particles (100 to 10,000)
+var d=2.0;  // Particle density at 100% zoom (1.0 to 10.0)
+var s=0.1;  // Visible radius of particles relative to r (0.01 to 1.00)
+var o=1.0;  // Background opacity (1.0 to 0.1)
+var f=25;   // Maximum frames rate (10 to 100)
+
+// Preset values of alpha, beta and gamma
+var preset=[[180,17,0.134,'Values from original paper',n,d,s,o,f,0],
+  [92,-15,0.125,'Internal contrarotation',1000,d,s,0.6,f,0],
+  [5,31,0.166,'Sprites',n,0.5,s,0.1,f,0],
+  // [-122,-6,0.111,'Cell growth',1000,d,s,o,f,0],
+  [-23,2,0.166,'Donuts',n,2.5,s,0.6,f,0],
+  [114,-4,0.166,'Goblins',800,d,s,0.4,f,0],
+  [173,-8,0.200,'Puff balls',1000,d,s,0.1,f,0],
+  [22,-29,0.125,'Lava lamp',400,d,s,0.1,f,0],
+  // [-1,51,0.166,'Primordial soup',1000,d,s,0.4,f,0],
+  [174,15,0.200,'Thick cell walls',1000,2.5,s,0.6,f,0],
+  [-90,-90,0.333,'Liquid crystal',n,0.5,s,0.1,f,0],
+  [-20,-25,0.143,'Gradual evolution',1000,d,s,0.6,f,0],
+  [146,8,0.125,'Thermophiles',1000,6,s,0.6,f,0],
+  [117,-4,0.143,'Amoebas merging and evolving',1000,4.5,s,0.6,f,0]];
+  // [35,-5,0.134,'Extreme density',1000,7.5,s,0.6,f,0],
+  
+// Run simulation
+function initialize() {
+  // Load values of alpha, beta and gamma
+  let url=window.location.search.substring(1).split(",");              // Check URL for settings
+  if (!url[0]) species(0);                                             // Default species
+  else if (url.length==1) species(url);                                // Load species presets
+  else if (url.length>=3) species(url[0],url[1],url[2]);               // Set species parameters
+  if (url.length>3) n=url[3], d=url[4], s=url[5], o=url[6], f=url[7];  // Environmental controls
+  
+  // Setup HTML canvas
+  canvas=document.getElementById("canvas");
+  context=canvas.getContext("2d");
+  refresh(dist);
+}
+
+// Set values of alpha, beta and gamma
+function species(abg) {
+  label='';
+  if (arguments.length==0) {
+    // Randomize values (360 × 120 × 100 = 4,320,000 possible values!)
+    a=Math.round(Math.random()*360)-180;  // Alpha (-180° to +180°)
+    b=Math.round(Math.random()*180)-90;   // Beta (-90° to +90°)
+    g=Math.ceil(Math.random()*100)/500;   // Gamma (0.002 to 0.200)
+  } else if (arguments.length==1) {
+    // Use preset values
+    a=preset[abg][0], b=preset[abg][1], g=preset[abg][2], label=preset[abg][3];
+    n=preset[abg][4], d=preset[abg][5], s=preset[abg][6], o=preset[abg][7], f=preset[abg][8], dist=preset[abg][9];
+  } else {
+    // Use selected values
+    a=arguments[0], b=arguments[1], g=arguments[2];
+  }
+  
+  // Convert to values radians!
+  a=(a/360)*tau, b=(b/360)*tau;
+  
+  // Update user interface
+  sliders(); showabg();
+}
+
+// Apply settings to control sliders
+function sliders() {
+  document.getElementById("alpha").value=Math.round((a/pi)*180);
+  document.getElementById("beta").value=Math.round((b/pi)*180);
+  document.getElementById("gamma").value=g;
+  document.getElementById("number").value=n;
+  document.getElementById("num").innerHTML=n;
+  document.getElementById("density").value=d;
+  document.getElementById("den").innerHTML=Math.round(d*z*z*100);
+  document.getElementById("size").value=s;
+  document.getElementById("trails").value=1-o;
+  document.getElementById("framerate").value=f;
+  document.getElementById("rate").innerHTML=f;
+}
+
+// Display current settings
+function showabg() {
+  let sHTML='α&thinsp;'+Math.round((a/pi)*180)+'°&emsp;β&thinsp;'+Math.round((b/pi)*180)+'°&emsp;γ&thinsp;'+g;
+  if (label) sHTML+='&emsp;<span id="label">'+label+'</span>';
+  document.getElementById("settings").innerHTML=sHTML;
+}
+
+// Begin new simulation
+function refresh(rd) {
+  if (!paused) playPause();
+  console.log(rd,dist);
+  if (rd!==undefined) dist=rd;
+  count=0, elapsed=0;
+  scale(); setvr(); populate(); sliders();
+  playPause();
+}
+
+// Pause/play simulation
+function playPause() {
+  if (paused) {
+    // Play simulation
+    paused=false;
+    time=new Date().getTime();
+    document.getElementById("controls").style.right='-45vh';
+    run=setInterval(step,1000/f);
+  } else {
+    // Pause simulation
+    paused=true;
+    elapsed+=(new Date().getTime()-time);
+    document.getElementById("controls").style.right='0';
+    window.clearTimeout(run);
+  }
+}
+
+// Set scale of viewport, canvas and particles
+function scale() {
+  // Screen dimensions
+  vw=window.innerWidth, vh=window.innerHeight;     // Viewport dimensions (CSS pixels)
+  z=Math.round(((window.outerWidth-8)/vw)*20)/20;  // Browser zoom level (desktop)
+  dpr=Math.round(window.devicePixelRatio*20)/20;   // Device Pixel Ratio (mobile)
+  cw=(vw*dpr), ch=(vh*dpr);                        // HTML canvas dimensions
+  
+  // Set display size (CSS pixels)
+  canvas.style.width=vw+'px';
+  canvas.style.height=vh+'px';
+  
+  // Set actual size in memory (scaled to DPR)
+  canvas.width=cw;
+  canvas.height=ch;
+  
+  // Normalize coordinate system to use CSS pixels
+  context.scale(dpr,dpr);
+  
+  console.log('Viewport: vw='+vw+' vh='+vh+'\nScaling: z='+z+' dpr='+dpr+'\nCanvas: cw='+cw+' ch='+ch);
+}
+
+// Calculate r and v based on viewport dimensions, density and gamma
+function setvr() {
+  let pff=2;                                      // Phantom Fudge Factor (WTF!?)
+  r=pff*Math.sqrt((vw*vh*z*z*d)/(n*pi)), r2=r*r;  // Radius of neighbourhoods (r)
+  v=g*r;                                          // Speed of particles
+  sr=s*r, sr2=sr*2, sr4=sr*4, srdpr=sr*dpr;       // Scale visible size of particles
+  
+  console.log('r='+r+'\nv='+v);
+}
+
+// Create particles and place within environment
+function populate() {
+  // Randomize position and orientation of particles
+  for (i=0; i<10000; i++) {
+    p[i]=new Array(6);  // Each particle has 6 variables
+    if (dist==0) {
+      // Set uniform distribution
+      p[i][0]=Math.random()*vw;  // Set random x coordinate
+      p[i][1]=Math.random()*vh;  // Set random y coordinate
+    } else if (dist==1) {
+      // Set centre-weighted distribution
+      let mx=Math.max(0,(vw-vh)/2), my=Math.max(0,(vh-vw)/2), min=Math.min(vw,vh);
+      p[i][0]=mx+((Math.random()+Math.random()+Math.random())/3)*min;  // Set random x coordinate
+      p[i][1]=my+((Math.random()+Math.random()+Math.random())/3)*min;  // Set random y coordinate
     }
-        
-    function scope(val,max) {
-      // Ensure values are between 0 and max
-      if (val>max) val=val%max;
-      else if (val<0) val=max+(val%max);
-      return val;
-    }
-    
-    function step() {
-      count++;
-      // Calculate and apply changes in orientation
-      let method=1;
-      if (method==1) {
-        // This method is not well optimized when dealing with many thousands of particles
-        // The total number of calculations required is roughly proportional to the square of n
-        for (i=0; i<n; i++) {                               // Compare every particle...
-          for (j=i+1; j<n; j++) {                           // ...to every other particle
-            let sX=p[j][0]-p[i][0];                         // Calculate x-axis separation
-            if (Math.abs(sX)<r) {                           // Only if x-axis separation is less than r
-              let sY=p[j][1]-p[i][1];                       // Calculate y-axis separation
-              if (Math.abs(sY)<r) {                         // Only if y-axis separation is also less than r
-                let sD=(sX*sX)+(sY*sY);                     // Calculate the square of the separation distance
-                if (sD<r2) {                                // Only if separation distance is also less than r
-                  p[i][3]++, p[j][3]++;                     // Increase total neighbour counts
-                  let sA=scope(Math.atan2(sY,sX),tau);      // Calculate separation angle using trigonometry
-                  if (scope(sA-p[i][2],tau)<pi) p[i][5]++;  // Particle j is to the right of i
-                  else p[i][4]++;                           // Particle j is to the left of i
-                  if (scope(sA-p[j][2],tau)>pi) p[j][5]++;  // Particle i is to the right of j
-                  else p[j][4]++;                           // Particle i is to the left of j
-                }
-              }
+    p[i][2]=Math.random()*tau;  // Set random orientation (phi)
+    p[i][3]=0;                  // Number of neighbours
+    p[i][4]=0;                  // Neighbours on left
+    p[i][5]=0;                  // Neighbours on right
+  }
+}
+
+// Advance simulation by one step (this function is called f times per second)
+function step() {
+  count++;
+  // Calculate and apply changes in orientation
+  let method=1;
+  if (method==1) {
+    // This method is not well optimized when dealing with many thousands of particles
+    // The total number of calculations required is roughly proportional to the square of n
+    for (i=0; i<n; i++) {                               // Compare every particle...
+      for (j=i+1; j<n; j++) {                           // ...to every other particle
+        let sX=p[j][0]-p[i][0];                         // Calculate x-axis separation
+        if (Math.abs(sX)<r) {                           // Only if x-axis separation is less than r
+          let sY=p[j][1]-p[i][1];                       // Calculate y-axis separation
+          if (Math.abs(sY)<r) {                         // Only if y-axis separation is also less than r
+            let sD=(sX*sX)+(sY*sY);                     // Calculate the square of the separation distance
+            if (sD<r2) {                                // Only if separation distance is also less than r
+              p[i][3]++, p[j][3]++;                     // Increase total neighbour counts
+              let sA=scope(Math.atan2(sY,sX),tau);      // Calculate separation angle using trigonometry
+              if (scope(sA-p[i][2],tau)<pi) p[i][5]++;  // Particle j is to the right of i
+              else p[i][4]++;                           // Particle j is to the left of i
+              if (scope(sA-p[j][2],tau)>pi) p[j][5]++;  // Particle i is to the right of j
+              else p[j][4]++;                           // Particle i is to the left of j
             }
           }
-          
-          // delta_phi = alpha + beta × N × sign(R - L)
-          let deltaPhi=a+(b*p[i][3]*Math.sign(p[i][5]-p[i][4]));
-          
-          // Turn right delta_phi
-          p[i][2]=scope(p[i][2]+deltaPhi,tau);
-        }
-      } else if (method==2) {
-        // Here's where I need to code a faster, grid-based method for calculating all the changes in orientation
-        for (i=0; i<n; i++) {
-          <!-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~  // Do this -->
-          <!-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~  // Do that -->
-          <!-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~  // Do the other -->
-          
-          // delta_phi = alpha + beta × N × sign(R - L)
-          let deltaPhi=a+(b*p[i][3]*Math.sign(p[i][5]-p[i][4]));
-          
-          // Turn right delta_phi
-          p[i][2]=scope(p[i][2]+deltaPhi,tau);
         }
       }
-        
-      // Clear HTML canvas
-      context.fillStyle='rgba(0,0,0,'+o+')';
-      context.fillRect(0,0,vw,vh);
       
-      // Reposition particles
-      for (i=0; i<n; i++) {
-        // Move forward v
-        p[i][0]+=(v*Math.cos(p[i][2]));  // X coordinate
-        p[i][1]+=(v*Math.sin(p[i][2]));  // Y coordinate
-        
-        // Wrap screen edges, Pac-Man style
-        p[i][0]=scope(p[i][0]+sr2,vw+sr4)-sr2;  // X coordinate
-        p[i][1]=scope(p[i][1]+sr2,vh+sr4)-sr2;  // Y coordinate
-        
-        // Select HSL based on number of neighbours
-        let hue=(p[i][3]*7)+90;       // Ranges from green to blue, magenta, red, orange, yellow...
-        hsl='hsl('+hue+',100%,50%)';  // Hue, saturation and lightness
-        
-        // Reset values of N, L and R
-        p[i][3]=0, p[i][4]=0, p[i][5]=0;
-        
-        if (srdpr>2) {
-          // Draw circles
-          context.beginPath();
-          context.arc(p[i][0],p[i][1],sr,0,tau);
-          context.fillStyle=hsl;
-          context.fill();
-          context.closePath();
-        } else {
-          // Draw small squares
-          context.fillStyle=hsl;
-          context.fillRect(p[i][0]-sr,p[i][1]-sr,sr2,sr2);
-        }
-      }
-      // console.log('count='+count+' fps='+Math.round(((count*1000)/(elapsed+(new Date().getTime()-time)))*10)/10+' (average)');
-    }
-    
-    function playPause() {
-      if (paused) {
-        // Play simulation
-        paused=false;
-        time=new Date().getTime();
-        document.getElementById("controls").style.right='-45vh';
-        run=setInterval(step,1000/f);
-      } else {
-        // Pause simulation
-        paused=true;
-        elapsed+=(new Date().getTime()-time);
-        document.getElementById("controls").style.right='0';
-        window.clearTimeout(run);
-      }
-    }
-    
-    function refresh(dist) {
-      // Begin new simulation
-      if (!paused) playPause();
-      count=0, elapsed=0;
-      scale();
-      document.getElementById("den").innerHTML=Math.round(d*z*z*100);  // Zooming affects density
-      setvr();
-      populate(dist);
-      playPause();
-    }
-
-    function initialize() {
-      // Load values of alpha, beta and gamma
-      let url=window.location.search.substring(1).split(",");              // Check URL for settings
-      if (!url[0]) species(0);                                             // Default species
-      else if (url.length==1) species(url);                                // Load species presets
-      else if (url.length>=3) species(url[0],url[1],url[2]);               // Set species parameters
-      if (url.length>3) n=url[3], d=url[4], s=url[5], o=url[6], f=url[7];  // Environmental controls
+      // delta_phi = alpha + beta × N × sign(R - L)
+      let deltaPhi=a+(b*p[i][3]*Math.sign(p[i][5]-p[i][4]));
       
-      // Setup HTML canvas
-      canvas=document.getElementById("canvas");
-      context=canvas.getContext("2d");
-      refresh(0);
+      // Turn right delta_phi
+      p[i][2]=scope(p[i][2]+deltaPhi,tau);
     }
-
-    // Display current settings
-    function showabg() {
-      let sHTML='α&thinsp;'+Math.round((a/pi)*180)+'°&emsp;β&thinsp;'+Math.round((b/pi)*180)+'°&emsp;γ&thinsp;'+g;
-      if (label) sHTML+='&emsp;<span id="label">'+label+'</span>';
-      document.getElementById("settings").innerHTML=sHTML;
+  } else if (method==2) {
+    // Here's where I need to code a faster, grid-based method for calculating all the changes in orientation
+    for (i=0; i<n; i++) {
+      <!-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~  // Do this -->
+      <!-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~  // Do that -->
+      <!-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~  // Do the other -->
+      
+      // delta_phi = alpha + beta × N × sign(R - L)
+      let deltaPhi=a+(b*p[i][3]*Math.sign(p[i][5]-p[i][4]));
+      
+      // Turn right delta_phi
+      p[i][2]=scope(p[i][2]+deltaPhi,tau);
     }
+  }
     
-    // Apply settings
-    function change(id,value) {
-      if (id=='alpha') a=(value/180)*pi;
-      else if (id=='beta') b=(value/180)*pi;
-      else if (id=='gamma') { g=value, v=g*r; }
-      else if (id=='number') { n=value; setvr(); document.getElementById("num").innerHTML=n; }
-      else if (id=='density') { d=value; scale; setvr(); document.getElementById("den").innerHTML=Math.round(d*z*z*100); }
-      else if (id=='trails') o=1-value;
-      else if (id=='size') s=value, sr=s*r, sr2=sr*2, sr4=sr*4, srdpr=sr*dpr;
-      else if (id=='framerate') { f=value; document.getElementById("rate").innerHTML=f; }
-      if ((id=='alpha') || (id=='beta') || (id=='gamma')) { label=''; showabg(); }
-      if ((paused) && (id!='framerate')) step();
-      else if ((id=='framerate') && (!paused)) { window.clearTimeout(run); run=setInterval(step,1000/f); }
-    }
-  </script>
+  // Clear HTML canvas (or leave trails)
+  context.fillStyle='rgba(0,0,0,'+o+')';
+  context.fillRect(0,0,vw,vh);
   
-  <style>
-    * { border:0;  margin:0; padding:0; vertical-align:baseline; -webkit-box-sizing:border-box; -moz-box-sizing:border-box; box-sizing:border-box; }
-    body { background:#000; font-family:Roboto; font-weight:200; text-shadow:0 0.2vmin 0.3vmin #000; overflow:hidden; }
-    #settings { cursor:pointer; font-size:3vmin; color:#AAA; padding:3vmin; position:fixed; bottom:0vmin; left:0vmin; z-index:2; }
-    #label { color:#666; }
-    #controls { padding:4.5vh 0 1.5vh 0; width:45.15vh; height:100vh; background:rgba(48,48,48,0.9); border-left:0.1vh solid #000; text-align:center; position:absolute; top:0; right:-45vh; z-index:2; transition:right 0.25s; }
-    #controls:hover { right:0 !important; }
-    #controls h1 { font-size:3vh; font-weight:normal; color:#FFF; line-height:1; }
-    #controls h2 { margin:2.5vh 0 1vh 0; font-size:2.5vh; font-weight:normal; color:#FFF; }
-    #controls p { margin-bottom:3vmin; font-size:1.8vh; color:#CCC; line-height:1.5; }
-    #controls p a { color:#EEE; text-decoration:none; }
-    #controls p a:hover { color:#FFF; }
-    input[type=range] { margin:0.75vh 0; width:34vh; height:2vh; }
-    input[type=button] { margin:0.5vh 0; width:16vh; height:3vh; font-size:1.8vh; }
-  </style>
+  // Reposition particles
+  for (i=0; i<n; i++) {
+    // Move forward v
+    p[i][0]+=(v*Math.cos(p[i][2]));  // X coordinate
+    p[i][1]+=(v*Math.sin(p[i][2]));  // Y coordinate
+    
+    // Wrap screen edges, Pac-Man style
+    p[i][0]=scope(p[i][0]+sr2,vw+sr4)-sr2;  // X coordinate
+    p[i][1]=scope(p[i][1]+sr2,vh+sr4)-sr2;  // Y coordinate
+    
+    // Select HSL based on number of neighbours
+    let hue=(p[i][3]*7)+90;       // Ranges from green to blue, magenta, red, orange, yellow...
+    hsl='hsl('+hue+',100%,50%)';  // Hue, saturation and lightness
+    
+    // Reset values of N, L and R
+    p[i][3]=0, p[i][4]=0, p[i][5]=0;
+    
+    if (srdpr>2) {
+      // Draw circles
+      context.beginPath();
+      context.arc(p[i][0],p[i][1],sr,0,tau);
+      context.fillStyle=hsl;
+      context.fill();
+      context.closePath();
+    } else {
+      // Draw small squares
+      context.fillStyle=hsl;
+      context.fillRect(p[i][0]-sr,p[i][1]-sr,sr2,sr2);
+    }
+  }
+  // console.log('count='+count+' fps='+Math.round(((count*1000)/(elapsed+(new Date().getTime()-time)))*10)/10+' (average)');
+}
+
+// Ensure values are between 0 and max
+function scope(val,max) {
+  if (val>max) val=val%max;
+  else if (val<0) val=max+(val%max);
+  return val;
+}
+
+// Demo species presets then show random species
+function next() {
+  let total=preset.length;
+  if (demo<total) {
+    // Cycle through presets
+    species(demo);
+    demo++;
+  } else if (demo==total) {
+    // Random species, default environment
+    n=600, d=2.0, s=0.1, o=0.6, f=25;
+    species();
+    demo++;
+  } else {
+    // Randomize species values
+    species();
+  }
+  refresh();
+}
+
+// Apply control panel settings (user inputs)
+function change(id,value) {
+  if (id=='alpha') a=(value/180)*pi;
+  else if (id=='beta') b=(value/180)*pi;
+  else if (id=='gamma') { g=value, v=g*r; }
+  else if (id=='number') { n=value; setvr(); document.getElementById("num").innerHTML=n; }
+  else if (id=='density') { d=value; scale; setvr(); document.getElementById("den").innerHTML=Math.round(d*z*z*100); }
+  else if (id=='trails') o=1-value;
+  else if (id=='size') s=value, sr=s*r, sr2=sr*2, sr4=sr*4, srdpr=sr*dpr;
+  else if (id=='framerate') { f=value; document.getElementById("rate").innerHTML=f; }
+  if ((id=='alpha') || (id=='beta') || (id=='gamma')) { label=''; showabg(); }
+  if ((paused) && (id!='framerate')) step();
+  else if ((id=='framerate') && (!paused)) { window.clearTimeout(run); run=setInterval(step,1000/f); }
+}
+
+// Open a new page using current settings
+function link(env) {
+  let href=window.location;
+  href=href.protocol+href.pathname+href.hostname+'?'+Math.round((a/pi)*180)+','+Math.round((b/pi)*180)+','+g;
+  if (env) href+=','+n+','+d+','+s+','+o+','+f;
+  window.open(href,'_self');
+}
+</script>
+
+<style>
+* { border:0;  margin:0; padding:0; vertical-align:baseline; -webkit-box-sizing:border-box; -moz-box-sizing:border-box; box-sizing:border-box; }
+body { background:#000; font-family:Roboto; font-weight:200; text-shadow:0 0.2vmin 0.3vmin #000; overflow:hidden; }
+#settings { cursor:pointer; font-size:3vmin; color:#AAA; padding:3vmin; position:fixed; bottom:0vmin; left:0vmin; z-index:2; }
+#label { color:#666; }
+#controls { padding:4.5vh 0 1.5vh 0; width:45.15vh; height:100vh; background:rgba(48,48,48,0.9); border-left:0.1vh solid #000; text-align:center; position:absolute; top:0; right:-45vh; z-index:2; transition:right 0.25s; }
+#controls:hover { right:0 !important; }
+#controls h1 { font-size:3vh; font-weight:normal; color:#FFF; line-height:1; cursor:pointer; }
+#controls h2 { margin:2.5vh 0 1vh 0; font-size:2.5vh; font-weight:normal; color:#FFF; cursor:pointer; }
+#controls p { margin-bottom:3vmin; font-size:1.8vh; color:#CCC; line-height:1.5; }
+#controls p a { color:#EEE; text-decoration:none; }
+#controls p a:hover { color:#FFF; }
+input[type=range] { margin:0.75vh 0; width:34vh; height:2vh; cursor:pointer; }
+input[type=button] { margin:0.5vh 0; width:16vh; height:3vh; font-size:1.8vh; cursor:pointer; }
+</style>
+
 </head>
-<body onLoad="initialize();" onResize="refresh(0);">
+<body onLoad="initialize();" onResize="refresh();">
   <canvas id="canvas" onClick="playPause();"></canvas>
   <div id="settings" onClick="next();"></div>
   <div id="controls" onMouseOver="this.style.right='-45vh';">
@@ -343,14 +358,14 @@
       Originally developed at Graz University<br />
       by Thomas Schmickl & Martin Stefanec<br />
       <a href="https://www.youtube.com/watch?v=makaJpLvbow" target="youtube">&nbsp;»&thinsp;Watch the YouTube video&thinsp;«&nbsp;</a></p>
-    <h2>Species parameters</h2>
+    <h2 onClick="link(0);">Species parameters</h2>
     <p>Alpha (intrinsic turning angle)<br />
       <input id="alpha" type="range" min="-180" max="180" step="1" onInput="change(this.id,this.value);" /><br />
       Beta (reactive turning angle)<br />
-      <input id="beta" type="range" min="-60" max="60" step="1" onInput="change(this.id,this.value);" /><br />
+      <input id="beta" type="range" min="-90" max="90" step="1" onInput="change(this.id,this.value);" /><br />
       Gamma (step size)<br />
       <input id="gamma" type="range" min="0.005" max="0.5" step="0.005" onInput="change(this.id,this.value);" /></p>
-    <h2>Environmental controls</h2>
+    <h2 onClick="link(1);">Environmental controls</h2>
     <p>Number of particles (<span id="num"></span>)<br />
       <input id="number" type="range" min="200" max="10000" step="200" onInput="change(this.id,this.value);" /><br />
       Particle density (<span id="den"></span>%)<br />
@@ -360,8 +375,8 @@
       Particle trails<br />
       <input id="trails" type="range" min="0" max="0.9" step="0.01" onInput="change(this.id,this.value);" /><br />
       Frame rate (<span id="rate"></span>fps)<br />
-      <input id="framerate" type="range" min="5" max="100" step="5" onInput="change(this.id,this.value);" /></p>
-    <p>Redistribute<br />
+      <input id="framerate" type="range" min="5" max="100" step="5" onInput="change(this.id,this.value);" /><br />
+      Redistribute<br />
       <input type="button" value="Random" onClick="refresh(0);" />&emsp;<input type="button" value="Centre" onClick="refresh(1);" /></p>
   </div>
 </body>
