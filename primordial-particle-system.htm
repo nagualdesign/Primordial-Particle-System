@@ -13,7 +13,7 @@
 // This video focuses primarily on specific values of alpha, beta, v and r
 // It goes on to show the effects of altering the values of alpha and beta
 // Here you can also explore various values of gamma, the ratio of v and r
-//    Gamma = speed of particles (v) / radius of neighbourhoods (r)
+//    Gamma (γ) = speed of particles (v) / radius of neighbourhoods (r)
 // Particle behaviour is only dependent on values of alpha, beta and gamma
 // Any particular combination of alpha, beta and gamma is called a species
 // Differences in particle density will affect a species overall behaviour
@@ -21,47 +21,51 @@
 // You can also increase or decrease particle density by zooming in or out
 
 // Global variables
-const pi=Math.PI, tau=2*pi;         // Used extensively
-var canvas, context;                // HTML canvas DOM elements
-var p=new Array(10000);             // Particle parameters
-var a, b, g, label, demo=1;         // Species parameters
-var vw, vh, z, dpr, cw, ch;         // Viewport and canvas dimensions
-var r, r2, v, sr, sr2, sr4, srdrp;  // Used extensively
-var count, elapsed, time, fps;      // Stopwatch parameters
-var dist=0, paused=true;            // Simulation parameters
+const pi=Math.PI, tau=2*pi;                     // Used extensively
+var canvas, context;                            // HTML canvas DOM elements
+var p=new Array(10000);                         // Particle parameters
+var a, b, g, label, demo=1;                     // Species parameters
+var vw, vh, z, dpr, cw, ch;                     // Viewport and canvas dimensions
+var r, r2, v, sr, sr2, vwsr4, vhsr4, srdrp;     // Used extensively
+var count, elapsed, time, dist=0, paused=true;  // Simulation parameters
 
 // Default settings
 var n=600;  // Number of particles (100 to 10,000)
-var d=2.0;  // Particle density at 100% zoom (1.0 to 10.0)
+var d=8.0;  // Particle density at 100% zoom (1.0 to 10.0)
 var s=0.1;  // Visible radius of particles relative to r (0.01 to 1.00)
 var o=1.0;  // Background opacity (1.0 to 0.1)
 var f=25;   // Maximum frames rate (10 to 100)
 
 // Preset values of alpha, beta and gamma
-var preset=[[180,17,0.134,'Values from original paper',n,d,s,o,f,0],
+var preset=[[180,17,0.134,'Values from original paper',n,d,s,o,15,0],
   [92,-15,0.125,'Internal contrarotation',1000,d,s,0.6,f,0],
-  [5,31,0.166,'Sprites',n,0.5,s,0.1,f,0],
+  [5,31,0.166,'Sprites',n,2,s,0.1,f,0],
   // [-122,-6,0.111,'Cell growth',1000,d,s,o,f,0],
-  [-23,2,0.166,'Donuts',n,2.5,s,0.6,f,0],
+  [-23,2,0.166,'Donuts',n,10,s,0.6,f,0],
   [114,-4,0.166,'Goblins',800,d,s,0.4,f,0],
   [173,-8,0.200,'Puff balls',1000,d,s,0.1,f,0],
   [22,-29,0.125,'Lava lamp',400,d,s,0.1,f,0],
   // [-1,51,0.166,'Primordial soup',1000,d,s,0.4,f,0],
-  [174,15,0.200,'Thick cell walls',1000,2.5,s,0.6,f,0],
-  [-90,-90,0.333,'Liquid crystal',n,0.5,s,0.1,f,0],
+  [174,15,0.200,'Thick cell walls',1000,10,s,0.6,f,0],
+  [-90,-90,0.333,'Liquid crystal',n,1,s,0.1,f,0],
   [-20,-25,0.143,'Gradual evolution',1000,d,s,0.6,f,0],
-  [146,8,0.125,'Thermophiles',1000,6,s,0.6,f,0],
-  [117,-4,0.143,'Amoebas merging and evolving',1000,4.5,s,0.6,f,0]];
-  // [35,-5,0.134,'Extreme density',1000,7.5,s,0.6,f,0],
+  [146,8,0.125,'Thermophiles',1000,20,0.075,0.6,f,0],
+  [117,-4,0.143,'Amoebas merging and evolving',1000,18,0.075,0.6,f,0],
+  [35,-5,0.134,'Extreme density',1000,32,0.075,0.6,f,0],
+  [-176,-5,0.012,'Nascent organelles',2500,d,0.05,0.6,f,1],
+  [-70,5,0.13,'Nascent organelles',1600,d,0.075,0.5,f,1],
+  [-177,3,0.27,'Shockwave',1600,10,0.075,0.6,f,1],
+  [-69,-1,0.205,'Rainbow juice',2000,d,0.05,0.3,f,1],
+  [42,9,0.275,'Cell nucleus',1500,4,0.075,0.6,f,1]];
   
 // Run simulation
 function initialize() {
   // Load values of alpha, beta and gamma
-  let url=window.location.search.substring(1).split(",");              // Check URL for settings
-  if (!url[0]) species(0);                                             // Default species
-  else if (url.length==1) { demo=url; species(url); }                  // Load species presets
-  else if (url.length>=3) species(url[0],url[1],url[2]);               // Set species parameters
-  if (url.length>3) n=url[3], d=url[4], s=url[5], o=url[6], f=url[7];  // Environmental controls
+  let url=window.location.search.substring(1).split(",");                           // Check URL for settings
+  if (!url[0]) species(0);                                                          // Default species
+  else if (url.length==1) { demo=url; species(url); }                               // Load species presets
+  else if (url.length>=3) species(url[0],url[1],url[2]);                            // Set species parameters
+  if (url.length>3) n=url[3], d=url[4], s=url[5], o=url[6], f=url[7], dist=url[8];  // Environmental controls
   
   // Setup HTML canvas
   canvas=document.getElementById("canvas");
@@ -76,7 +80,7 @@ function species(abg) {
     // Randomize values (360 × 120 × 100 = 4,320,000 possible values!)
     a=Math.round(Math.random()*360)-180;  // Alpha (-180° to +180°)
     b=Math.round(Math.random()*180)-90;   // Beta (-90° to +90°)
-    g=Math.ceil(Math.random()*100)/500;   // Gamma (0.002 to 0.200)
+    g=Math.ceil(Math.random()*100)/200;   // Gamma (0.005 to 0.500)
   } else if (arguments.length==1) {
     // Use preset values
     a=preset[abg][0], b=preset[abg][1], g=preset[abg][2], label=preset[abg][3];
@@ -160,16 +164,15 @@ function scale() {
   // Normalize coordinate system to use CSS pixels
   context.scale(dpr,dpr);
   
-  // console.log('Viewport: vw='+vw+' vh='+vh+'\nScaling: z='+z+' dpr='+dpr+'\nCanvas: cw='+cw+' ch='+ch);
+  console.log('Viewport: vw='+vw+' vh='+vh+'\nScaling: z='+z+' dpr='+dpr+'\nCanvas: cw='+cw+' ch='+ch);
 }
 
 // Calculate r and v based on viewport dimensions, density and gamma
 function setvr() {
-  let pff=2;                                      // Phantom Fudge Factor (WTF!?)
-  r=pff*Math.sqrt((vw*vh*z*z*d)/(n*pi)), r2=r*r;  // Radius of neighbourhoods (r)
-  v=g*r;                                          // Speed of particles
-  sr=s*r, sr2=sr*2, sr4=sr*4, srdpr=sr*dpr;       // Scale visible size of particles
-  console.log('r='+r+'\nv='+v);                   // Display values in the console
+  r=Math.sqrt((vw*vh*z*z*d)/(n*pi)), r2=r*r;                         // Radius of neighbourhoods (r)
+  v=g*r;                                                             // Speed of particles
+  sr=s*r, sr2=sr*2, vwsr4=(sr*4)+vw, vhsr4=(sr*4)+vh, srdpr=sr*dpr;  // Scale visible size of particles
+  console.log('r='+r+'\nv='+v+'\ns='+sr+'\ng='+g);                   // Display values in the console
 }
 
 // Create particles and place within environment
@@ -253,8 +256,8 @@ function step() {
     p[i][1]+=(v*Math.sin(p[i][2]));  // Y coordinate
     
     // Wrap screen edges, Pac-Man style
-    p[i][0]=scope(p[i][0]+sr2,vw+sr4)-sr2;  // X coordinate
-    p[i][1]=scope(p[i][1]+sr2,vh+sr4)-sr2;  // Y coordinate
+    p[i][0]=scope(p[i][0]+sr2,vwsr4)-sr2;  // X coordinate
+    p[i][1]=scope(p[i][1]+sr2,vhsr4)-sr2;  // Y coordinate
     
     // Select HSL based on number of neighbours
     let hue=(p[i][3]*7)+90;       // Ranges from green to blue, magenta, red, orange, yellow...
@@ -275,8 +278,24 @@ function step() {
       context.fillStyle=hsl;
       context.fillRect(p[i][0]-sr,p[i][1]-sr,sr2,sr2);
     }
+    if ((n<500) && (f<=15)) {
+      // Draw radii, orientation and gamma
+      context.beginPath();
+      context.moveTo(p[i][0],p[i][1]);
+      context.lineTo(p[i][0]+(v*Math.cos(p[i][2])),p[i][1]+(v*Math.sin(p[i][2])));
+      context.strokeStyle='#888';
+      context.stroke();
+      context.closePath();
+      context.beginPath();
+      context.arc(p[i][0],p[i][1],r,0,tau);
+      context.strokeStyle='rgba(255,255,255,0.1)';
+      context.stroke();
+      context.closePath();
+    }
   }
-  // console.log('count='+count+' fps='+Math.round(((count*1000)/(elapsed+(new Date().getTime()-time)))*10)/10+' (average)');
+  // Crude stopwatch (not recommended!)
+  // let ms=elapsed+(new Date().getTime()-time), fps=Math.round(((count*1000)/ms)*10)/10;
+  // console.log(count+' cycles, '+ms+'ms ('+fps+'fps)');
 }
 
 // Ensure values are between 0 and max
@@ -295,7 +314,7 @@ function next() {
     demo++;
   } else if (demo==total) {
     // Random species, default environment
-    n=600, d=2.0, s=0.1, o=0.6, f=25;
+    n=600, d=8, s=0.1, o=0.6, f=25;
     species();
     demo++;
   } else {
@@ -313,7 +332,7 @@ function change(id,value) {
   else if (id=='number') { n=value; setvr(); document.getElementById("num").innerHTML=n; }
   else if (id=='density') { d=value; scale; setvr(); document.getElementById("den").innerHTML=Math.round(d*z*z*100); }
   else if (id=='trails') o=1-value;
-  else if (id=='size') s=value, sr=s*r, sr2=sr*2, sr4=sr*4, srdpr=sr*dpr;
+  else if (id=='size') s=value, sr=s*r, sr2=sr*2, vwsr4=vw+(sr*4), vhsr4=vh+(sr*4), srdpr=sr*dpr;
   else if (id=='framerate') { f=value; document.getElementById("rate").innerHTML=f; }
   if ((id=='alpha') || (id=='beta') || (id=='gamma')) { label=''; showabg(); }
   if ((paused) && (id!='framerate')) step();
@@ -327,7 +346,7 @@ function link(env) {
   if (label) href+=(demo-1);
   else {
     href+=Math.round((a/pi)*180)+','+Math.round((b/pi)*180)+','+g;
-    if (env) href+=','+n+','+d+','+s+','+o+','+f;
+    if (env) href+=','+n+','+d+','+s+','+o+','+f+','+dist;
   }
   window.open(href,'_self');
 }
@@ -369,13 +388,13 @@ input[type=button] { margin:0.5vh 0; width:16vh; height:3vh; font-size:1.8vh; cu
       <input id="gamma" type="range" min="0.005" max="0.5" step="0.005" onInput="change(this.id,this.value);" /></p>
     <h2 onClick="link(1);">Environmental controls</h2>
     <p>Number of particles (<span id="num"></span>)<br />
-      <input id="number" type="range" min="200" max="10000" step="200" onInput="change(this.id,this.value);" /><br />
+      <input id="number" type="range" min="100" max="10000" step="100" onInput="change(this.id,this.value);" /><br />
       Particle density (<span id="den"></span>%)<br />
-      <input id="density" type="range" min="0.5" max="10" step="0.5" onInput="change(this.id,this.value);" /><br />
+      <input id="density" type="range" min="1" max="50" step="1" onInput="change(this.id,this.value);" /><br />
       Particle size<br />
-      <input id="size" type="range" min="0.1" max="0.5" step="0.05" onInput="change(this.id,this.value);" /><br />
+      <input id="size" type="range" min="0.05" max="0.5" step="0.025" onInput="change(this.id,this.value);" /><br />
       Particle trails<br />
-      <input id="trails" type="range" min="0" max="0.9" step="0.01" onInput="change(this.id,this.value);" /><br />
+      <input id="trails" type="range" min="0" max="0.9" step="0.1" onInput="change(this.id,this.value);" /><br />
       Frame rate (<span id="rate"></span>fps)<br />
       <input id="framerate" type="range" min="5" max="100" step="5" onInput="change(this.id,this.value);" /><br />
       Redistribute<br />
