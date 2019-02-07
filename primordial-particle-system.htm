@@ -59,7 +59,7 @@ function initialize() {
   // Load values of alpha, beta and gamma
   let url=window.location.search.substring(1).split(",");              // Check URL for settings
   if (!url[0]) species(0);                                             // Default species
-  else if (url.length==1) species(url);                                // Load species presets
+  else if (url.length==1) { demo=url; species(url); }                  // Load species presets
   else if (url.length>=3) species(url[0],url[1],url[2]);               // Set species parameters
   if (url.length>3) n=url[3], d=url[4], s=url[5], o=url[6], f=url[7];  // Environmental controls
   
@@ -86,7 +86,7 @@ function species(abg) {
     a=arguments[0], b=arguments[1], g=arguments[2];
   }
   
-  // Convert to values radians!
+  // Convert values to radians!
   a=(a/360)*tau, b=(b/360)*tau;
   
   // Update user interface
@@ -118,7 +118,6 @@ function showabg() {
 // Begin new simulation
 function refresh(rd) {
   if (!paused) playPause();
-  console.log(rd,dist);
   if (rd!==undefined) dist=rd;
   count=0, elapsed=0;
   scale(); setvr(); populate(); sliders();
@@ -161,7 +160,7 @@ function scale() {
   // Normalize coordinate system to use CSS pixels
   context.scale(dpr,dpr);
   
-  console.log('Viewport: vw='+vw+' vh='+vh+'\nScaling: z='+z+' dpr='+dpr+'\nCanvas: cw='+cw+' ch='+ch);
+  // console.log('Viewport: vw='+vw+' vh='+vh+'\nScaling: z='+z+' dpr='+dpr+'\nCanvas: cw='+cw+' ch='+ch);
 }
 
 // Calculate r and v based on viewport dimensions, density and gamma
@@ -170,8 +169,7 @@ function setvr() {
   r=pff*Math.sqrt((vw*vh*z*z*d)/(n*pi)), r2=r*r;  // Radius of neighbourhoods (r)
   v=g*r;                                          // Speed of particles
   sr=s*r, sr2=sr*2, sr4=sr*4, srdpr=sr*dpr;       // Scale visible size of particles
-  
-  console.log('r='+r+'\nv='+v);
+  console.log('r='+r+'\nv='+v);                   // Display values in the console
 }
 
 // Create particles and place within environment
@@ -325,8 +323,12 @@ function change(id,value) {
 // Open a new page using current settings
 function link(env) {
   let href=window.location;
-  href=href.protocol+href.pathname+href.hostname+'?'+Math.round((a/pi)*180)+','+Math.round((b/pi)*180)+','+g;
-  if (env) href+=','+n+','+d+','+s+','+o+','+f;
+  href=href.protocol+href.pathname+href.hostname+'?';
+  if (label) href+=(demo-1);
+  else {
+    href+=Math.round((a/pi)*180)+','+Math.round((b/pi)*180)+','+g;
+    if (env) href+=','+n+','+d+','+s+','+o+','+f;
+  }
   window.open(href,'_self');
 }
 </script>
@@ -334,7 +336,7 @@ function link(env) {
 <style>
 * { border:0;  margin:0; padding:0; vertical-align:baseline; -webkit-box-sizing:border-box; -moz-box-sizing:border-box; box-sizing:border-box; }
 body { background:#000; font-family:Roboto; font-weight:200; text-shadow:0 0.2vmin 0.3vmin #000; overflow:hidden; }
-#settings { cursor:pointer; font-size:3vmin; color:#AAA; padding:3vmin; position:fixed; bottom:0vmin; left:0vmin; z-index:2; }
+#settings { cursor:pointer; font-size:3vmin; color:#AAA; padding:3vmin; position:fixed; bottom:0vmin; left:0vmin; z-index:3; }
 #label { color:#666; }
 #controls { padding:4.5vh 0 1.5vh 0; width:45.15vh; height:100vh; background:rgba(48,48,48,0.9); border-left:0.1vh solid #000; text-align:center; position:absolute; top:0; right:-45vh; z-index:2; transition:right 0.25s; }
 #controls:hover { right:0 !important; }
