@@ -25,9 +25,10 @@ const pi=Math.PI, tau=2*pi;                     // Used extensively
 var canvas, context;                            // HTML canvas DOM elements
 var p=new Array(10000);                         // Particle parameters
 var a, b, g, label, demo=0;                     // Species parameters
-var vw, vh, z, dpr, cw, ch;                     // Viewport and canvas dimensions
+var vw, vh, z, dpr, cw, ch;                     // Viewport and HTML canvas
 var r, r2, v, sr, sr2, vwsr4, vhsr4, srdrp;     // Used extensively
 var count, elapsed, time, dist=0, paused=true;  // Simulation parameters
+var hist, hl=0;                                 // Analytics
 
 // Default settings
 var n=600;  // Number of particles (100 to 10,000)
@@ -141,6 +142,7 @@ function playPause() {
     elapsed+=(new Date().getTime()-time);
     document.getElementById("controls").style.right='0';
     window.clearTimeout(run);
+    // histogram();
   }
 }
 
@@ -198,7 +200,7 @@ function populate() {
 
 // Advance simulation by one step (this function is called f times per second)
 function step() {
-  count++;
+  count++; hist=new Array(); hl-=0.5*(hl/f);
   // Calculate and apply changes in orientation
   let method=1;
   if (method==1) {
@@ -250,35 +252,28 @@ function step() {
   
   // Reposition particles
   for (i=0; i<n; i++) {
-    // Move forward v
-    p[i][0]+=(v*Math.cos(p[i][2]));  // X coordinate
-    p[i][1]+=(v*Math.sin(p[i][2]));  // Y coordinate
-    
-    // Wrap screen edges, Pac-Man style
-    p[i][0]=scope(p[i][0]+sr2,vwsr4)-sr2;  // X coordinate
-    p[i][1]=scope(p[i][1]+sr2,vhsr4)-sr2;  // Y coordinate
-    
+    if (hist[p[i][3]]===undefined) hist[p[i][3]]=0;
+    else hist[p[i][3]]++;
+        
     // Select HSL based on number of neighbours
     let hue=(p[i][3]*7)+90;       // Ranges from green to blue, magenta, red, orange, yellow...
     hsl='hsl('+hue+',100%,50%)';  // Hue, saturation and lightness
     
-    // Reset values of N, L and R
-    p[i][3]=0, p[i][4]=0, p[i][5]=0;
-    
     if (srdpr>2) {
-      // Draw circles
+      // Draw a circle
       context.beginPath();
       context.arc(p[i][0],p[i][1],sr,0,tau);
       context.fillStyle=hsl;
       context.fill();
       context.closePath();
     } else {
-      // Draw small squares
+      // Draw a small square
       context.fillStyle=hsl;
       context.fillRect(p[i][0]-sr,p[i][1]-sr,sr2,sr2);
     }
+    
     if ((n<=500) && (f<=15)) {
-      // Draw radii, orientation and gamma
+      // Show radii, orientation and gamma
       context.beginPath();
       context.moveTo(p[i][0],p[i][1]);
       context.lineTo(p[i][0]+(v*Math.cos(p[i][2])),p[i][1]+(v*Math.sin(p[i][2])));
@@ -291,10 +286,32 @@ function step() {
       context.stroke();
       context.closePath();
     }
+    
+    // Move forward v
+    p[i][0]+=(v*Math.cos(p[i][2]));  // X coordinate
+    p[i][1]+=(v*Math.sin(p[i][2]));  // Y coordinate
+    
+    // Wrap screen edges, Pac-Man style
+    p[i][0]=scope(p[i][0]+sr2,vwsr4)-sr2;  // X coordinate
+    p[i][1]=scope(p[i][1]+sr2,vhsr4)-sr2;  // Y coordinate
+    
+    // Reset values of N, L and R
+    p[i][3]=0, p[i][4]=0, p[i][5]=0;
   }
-  // Crude stopwatch (not recommended!)
-  // let ms=elapsed+(new Date().getTime()-time), fps=Math.round(((count*1000)/ms)*10)/10;
-  // console.log(count+' cycles, '+ms+'ms ('+fps+'fps)');
+  
+  // Log metrics
+  histogram();
+  // let ms=elapsed+(new Date().getTime()-time), fps=Math.round(((count*1000)/ms)*10)/10; console.log(count+' cycles, '+ms+'ms ('+fps+'fps)');
+}
+
+function histogram() {
+  if (eval(hist.length)>hl) hl=hist.length;
+  let col=vw/hl, scale=10;
+  for (i=0; i<hl; i++) if (hist[i]>0) {
+    let bar=Math.sqrt(hist[i])*scale;
+    context.fillStyle='hsla('+((i*7)+90)+',100%,50%,'+(50*o)+'%)';
+    context.fillRect(i*col,vh-bar,col,bar);
+  }
 }
 
 // Ensure values are between 0 and max
@@ -330,7 +347,7 @@ function change(id,value) {
 function link(env) {
   let href=window.location;
   href=href.protocol+href.pathname+href.hostname+'?';
-  if (label) href+=demo;
+  if (label!='&emsp;') href+=demo;
   else {
     href+=Math.round((a/pi)*180)+','+Math.round((b/pi)*180)+','+g;
     if (env) href+=','+n+','+d+','+s+','+o+','+f+','+dist;
