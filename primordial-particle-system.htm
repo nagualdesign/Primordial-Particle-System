@@ -250,7 +250,7 @@ function step() {
   context.fillStyle='rgba(0,0,0,'+o+')';
   context.fillRect(0,0,vw,vh);
   
-  // Reposition particles
+  // Ppsition particles
   for (i=0; i<n; i++) {
     if (hist[p[i][3]]===undefined) hist[p[i][3]]=0;
     else hist[p[i][3]]++;
@@ -309,7 +309,7 @@ function histogram() {
   let col=vw/hl, scale=10;
   for (i=0; i<hl; i++) if (hist[i]>0) {
     let bar=Math.sqrt(hist[i])*scale;
-    context.fillStyle='hsla('+((i*7)+90)+',100%,50%,'+(50*o)+'%)';
+    context.fillStyle='hsla('+((i*7)+90)+',100%,25%,'+(50*o)+'%)';
     context.fillRect(i*col,vh-bar,col,bar);
   }
 }
