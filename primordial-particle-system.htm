@@ -23,8 +23,7 @@
 // Global variables
 const pi=Math.PI, tau=2*pi;                     // Used extensively
 var canvas, context;                            // HTML canvas DOM elements
-var p=new Array(10000);                         // Particle parameters
-var a, b, g, label, demo=0;                     // Species parameters
+var p, a, b, g, caption, demo=0;                // Particle parameters
 var vw, vh, z, dpr, cw, ch;                     // Viewport and HTML canvas
 var r, r2, v, sr, sr2, vwsr4, vhsr4, srdrp;     // Used extensively
 var count, elapsed, time, dist=0, paused=true;  // Simulation parameters
@@ -38,25 +37,32 @@ var o=1.0;  // Background opacity (1.0 to 0.1)
 var f=25;   // Maximum frames rate (10 to 100)
 
 // Preset values of alpha, beta and gamma
-var preset=[[-5,10,0.2,'<nobr>These are called Primordial Particles.</nobr> <nobr>They sense and react to particles nearby.</nobr> <nobr>Their behaviour follows 3 simple rules:</nobr><br />'+
-    '<nobr style="margin-top:calc(4.5vh - 4.5vmin);">At each step they turn by a fixed amount,</nobr> <nobr>then turn away or towards their neighbours,</nobr> <nobr>then move forwards by a fixed amount.</nobr>',100,1,0.1,1,5,0],
-  [180,17,0.134,'Some species exhibit cell-like behaviour',n,d,s,o,15,0],
-  [92,-15,0.125,'Internal contrarotation',1000,d,s,0.6,f,0],
-  [5,31,0.166,'Sprites',n,2,s,0.1,f,0],
-  [-23,2,0.166,'Donuts',n,10,s,0.6,f,0],
-  [114,-4,0.166,'Goblins',800,d,s,0.4,f,0],
-  [173,-8,0.200,'Puff balls',1000,d,s,0.1,f,0],
-  [22,-29,0.125,'Lava lamp',400,d,s,0.1,f,0],
-  [174,15,0.200,'Thick cell walls',1000,10,s,0.6,f,0],
-  [-90,-90,0.333,'Liquid crystal',1000,2,s,0.1,f,0],
-  [-20,-25,0.143,'Gradual evolution',1000,d,s,0.6,f,0],
-  [146,8,0.125,'Thermophiles',1000,20,0.075,0.6,f,0],
-  [117,-4,0.143,'Amoebas merging and evolving',1000,18,0.075,0.6,f,0],
-  [35,-5,0.134,'Extreme density',1000,32,0.075,0.6,f,0],
-  [-70,5,0.13,'Nascent organelles',1600,d,0.075,0.5,f,1],
-  [-177,3,0.27,'Shockwave',1600,10,0.075,0.6,f,1],
-  [-69,-1,0.205,'Rainbow juice',2000,d,0.05,0.3,f,1],
-  [42,9,0.275,'Cell nucleus',1500,5,0.075,0.6,f,1]];
+var preset=[[10,10,0.2,20,0.5,s,1,5,0,
+    '<nobr>These are called Primordial Particles.</nobr> '+
+    '<nobr>They sense and react to particles nearby.</nobr> '+
+    '<nobr>Their behaviour follows 3 simple rules:</nobr><br />'+
+    '<nobr class="break">At each step they turn by a fixed amount,</nobr> '+
+    '<nobr>then turn away or towards their neighbours,</nobr> '+
+    '<nobr>then move forwards by a fixed amount.</nobr>'],
+  [180,17,0.134,n,d,s,o,15,0,'Some species exhibit cell-like behaviour'],
+  [92,-15,0.125,1000,d,s,0.6,f,0,'Internal contrarotation'],
+  [5,31,0.166,n,2,s,0.1,f,0,'Sprites'],
+  [-23,2,0.166,n,10,s,0.6,f,0,'Donuts'],
+  [114,-4,0.166,800,d,s,0.4,f,0,'Goblins'],
+  [173,-8,0.200,1000,d,s,0.1,f,0,'Puff balls'],
+  [22,-29,0.125,400,d,s,0.1,f,0,'Lava lamp'],
+  [174,15,0.200,1000,10,s,0.6,f,0,'Thick cell walls'],
+  [-90,-90,0.333,1000,2,s,0.1,f,0,'Liquid crystal'],
+  [-20,-25,0.143,1000,d,s,0.6,f,0,'Gradual evolution'],
+  [146,8,0.125,1000,20,0.075,0.6,f,0,'Thermophiles'],
+  [117,-4,0.143,1000,18,0.075,0.6,f,0,'Amoebas merging and evolving'],
+  [35,-5,0.134,1000,32,0.075,0.6,f,0,'Extreme density'],
+  [-70,5,0.13,1600,d,0.075,0.5,f,1,'Nascent organelles'],
+  [-177,3,0.27,1600,10,0.075,0.6,f,1,'Shockwave'],
+  [-69,-1,0.205,2000,d,0.05,0.3,f,1,'Rainbow juice'],
+  [42,9,0.275,1500,5,0.075,0.6,f,1,'Cell nucleus'],
+  [0,13,0.2,2000,10,0.075,0.2,f,0,'Exchanging particles'],
+  [139,-28,0.1,100,2,0.05,0.1,100,1,'Silly string']];
   
 // Run simulation
 function initialize() {
@@ -70,12 +76,12 @@ function initialize() {
   // Setup HTML canvas
   canvas=document.getElementById("canvas");
   context=canvas.getContext("2d");
-  refresh(dist);
+  refresh();
 }
 
 // Set values of alpha, beta and gamma
 function species(abg) {
-  label='&emsp;';
+  caption='&emsp;';
   if (arguments.length==0) {
     // Randomize values (360 × 120 × 100 = 4,320,000 possible values!)
     a=Math.round(Math.random()*360)-180;  // Alpha (-180° to +180°)
@@ -83,8 +89,10 @@ function species(abg) {
     g=Math.ceil(Math.random()*100)/200;   // Gamma (0.005 to 0.500)
   } else if (arguments.length==1) {
     // Use preset values
-    a=preset[abg][0], b=preset[abg][1], g=preset[abg][2], label=preset[abg][3];
-    n=preset[abg][4], d=preset[abg][5], s=preset[abg][6], o=preset[abg][7], f=preset[abg][8], dist=preset[abg][9];
+    let pre=preset[abg];
+    a=pre[0], b=pre[1], g=pre[2];
+    n=pre[3], d=pre[4], s=pre[5], o=pre[6], f=pre[7];
+    dist=pre[8], caption=pre[9];
   } else {
     // Use selected values
     a=arguments[0], b=arguments[1], g=arguments[2];
@@ -114,9 +122,9 @@ function sliders() {
 
 // Display current settings
 function showabg() {
+  document.getElementById("info").innerHTML=caption;
   let sHTML='α&thinsp;'+Math.round((a/pi)*180)+'°&emsp;β&thinsp;'+Math.round((b/pi)*180)+'°&emsp;γ&thinsp;'+g;
   document.getElementById("settings").innerHTML=sHTML;
-  document.getElementById("info").innerHTML=label;
 }
 
 // Begin new simulation
@@ -124,11 +132,14 @@ function refresh(rd) {
   if (!paused) playPause();
   if (rd!==undefined) dist=rd;
   count=0, elapsed=0;
-  scale(); setvr(); populate(); sliders();
+  scale(); setvr(); sliders();
+  if (n>10000) p=new Array(eval(n));
+  else p=new Array(10000);
+  for (i=0; i<p.length; i++) p[i]=new Particle();
   playPause();
 }
 
-// Pause/play simulation
+// Play/pause simulation
 function playPause() {
   if (paused) {
     // Play simulation
@@ -142,8 +153,25 @@ function playPause() {
     elapsed+=(new Date().getTime()-time);
     document.getElementById("controls").style.right='0';
     window.clearTimeout(run);
-    // histogram();
+    histogram();
   }
+}
+
+function Particle() {
+  if (dist==0) {
+    // Set uniform distribution
+    this.x=Math.random()*vw;
+    this.y=Math.random()*vh;
+  } else if (dist==1) {
+    // Set centre-weighted distribution
+    let mx=Math.max(0,(vw-vh)/2), my=Math.max(0,(vh-vw)/2), min=Math.min(vw,vh);
+    this.x=mx+((Math.random()+Math.random()+Math.random())/3)*min;
+    this.y=my+((Math.random()+Math.random()+Math.random())/3)*min;
+  }
+  this.phi=Math.random()*tau;  // Set random orientation
+  this.N=0;                    // Number of neighbours
+  this.L=0;                    // Neighbours on left
+  this.R=0;                    // Neighbours on right
 }
 
 // Set scale of viewport, canvas and particles
@@ -170,148 +198,144 @@ function scale() {
 
 // Calculate r and v based on viewport dimensions, density and gamma
 function setvr() {
-  r=Math.sqrt((vw*vh*z*z*d)/(n*pi)), r2=r*r;                         // Radius of neighbourhoods (r)
-  v=g*r;                                                             // Speed of particles
-  sr=s*r, sr2=sr*2, vwsr4=(sr*4)+vw, vhsr4=(sr*4)+vh, srdpr=sr*dpr;  // Scale visible size of particles
-  console.log('r='+r+'\nv='+v+'\ns='+sr+'\ng='+g);                   // Display values in the console
-}
-
-// Create particles and place within environment
-function populate() {
-  // Randomize position and orientation of particles
-  for (i=0; i<10000; i++) {
-    p[i]=new Array(6);  // Each particle has 6 variables
-    if (dist==0) {
-      // Set uniform distribution
-      p[i][0]=Math.random()*vw;  // Set random x coordinate
-      p[i][1]=Math.random()*vh;  // Set random y coordinate
-    } else if (dist==1) {
-      // Set centre-weighted distribution
-      let mx=Math.max(0,(vw-vh)/2), my=Math.max(0,(vh-vw)/2), min=Math.min(vw,vh);
-      p[i][0]=mx+((Math.random()+Math.random()+Math.random())/3)*min;  // Set random x coordinate
-      p[i][1]=my+((Math.random()+Math.random()+Math.random())/3)*min;  // Set random y coordinate
-    }
-    p[i][2]=Math.random()*tau;  // Set random orientation (phi)
-    p[i][3]=0;                  // Number of neighbours
-    p[i][4]=0;                  // Neighbours on left
-    p[i][5]=0;                  // Neighbours on right
-  }
+  r=Math.sqrt((vw*vh*z*z*d)/(n*pi)), r2=r*r;                                   // Radius of neighbourhoods (r)
+  v=g*r;                                                                       // Speed of particles
+  sr=s*r, sr2=sr*2, sr4=sr*4, vwsr4=(sr*4)+vw, vhsr4=(sr*4)+vh, srdpr=sr*dpr;  // Scale visible size of particles
+  console.log('r='+r+'\nv='+v+'\ns='+sr+'\ng='+g);                             // Display values in the console
 }
 
 // Advance simulation by one step (this function is called f times per second)
 function step() {
   count++; hist=new Array(); hl-=0.5*(hl/f);
+  let gridCellSize=r;
+  let xCells=Math.ceil(vwsr4/gridCellSize)+1;
+  let yCells=Math.ceil(vhsr4/gridCellSize)+1;
+  
+  // Destroy and remake grid each frame
+  let grid=new Array(xCells);
+  for (i=0;i<xCells;i++) {
+    grid[i]=new Array(yCells);
+    for (ii=0;ii<yCells;ii++) grid[i][ii]=new Array;
+  }
+  
+  // Insert every particles index into a grid cell
+  for (i=0; i<n; i++) grid[Math.floor((p[i].x+sr4)/gridCellSize)][Math.floor((p[i].y+sr4)/gridCellSize)].push(i);
+  
   // Calculate and apply changes in orientation
-  let method=1;
-  if (method==1) {
-    // This method is not well optimized when dealing with many thousands of particles
-    // The total number of calculations required is roughly proportional to the square of n
-    for (i=0; i<n; i++) {                               // Compare every particle...
-      for (j=i+1; j<n; j++) {                           // ...to every other particle
-        let sX=p[j][0]-p[i][0];                         // Calculate x-axis separation
-        if (Math.abs(sX)<r) {                           // Only if x-axis separation is less than r
-          let sY=p[j][1]-p[i][1];                       // Calculate y-axis separation
-          if (Math.abs(sY)<r) {                         // Only if y-axis separation is also less than r
-            let sD=(sX*sX)+(sY*sY);                     // Calculate the square of the separation distance
-            if (sD<r2) {                                // Only if separation distance is also less than r
-              p[i][3]++, p[j][3]++;                     // Increase total neighbour counts
-              let sA=scope(Math.atan2(sY,sX),tau);      // Calculate separation angle using trigonometry
-              if (scope(sA-p[i][2],tau)<pi) p[i][5]++;  // Particle j is to the right of i
-              else p[i][4]++;                           // Particle j is to the left of i
-              if (scope(sA-p[j][2],tau)>pi) p[j][5]++;  // Particle i is to the right of j
-              else p[j][4]++;                           // Particle i is to the left of j
+  for (xg=0; xg<xCells; xg++) {							                            // Step through the grid cells (left to right)
+    for (yg=0; yg<yCells; yg++) {                                       // Step through the grid cells (top to bottom)
+      for (gp=0; gp<grid[xg][yg].length; gp++) {		                    // Step through the particles in each grid
+        let i=grid[xg][yg][gp];                                         // Now we have a particle index and we're already in the right grid
+        for (xc=Math.max(0,xg-1); xc<Math.min(xg+2, xCells); xc++) {    // Iterate through the 8 neighbour cells (left to right)
+          for (yc=Math.max(0,yg-1); yc<Math.min(yg+2, yCells); yc++) {  // Iterate through the 8 neighbour cells (top to bottom)
+            for (jp=0; jp<grid[xc][yc].length; jp++) {                  // Iterate through the particles in each cell			
+              let j=grid[xc][yc][jp];                                   // Finally we have both i & j
+              if (i<j) {                                                // Still not gonna check it twice
+                let sX=p[j].x-p[i].x;                                   // Calculate x-axis separation
+                if (Math.abs(sX)<r) {                                   // Only if x-axis separation is less than r
+                  let sY=p[j].y-p[i].y;                                 // Calculate y-axis separation
+                  if (Math.abs(sY)<r) {                                 // Only if y-axis separation is also less than r
+                    let sD=(sX*sX)+(sY*sY);                             // Calculate the square of the separation distance
+                    if (sD<r2) {                                        // Only if separation distance is also less than r
+                      p[i].N++, p[j].N++;                               // Increase total neighbour counts
+                      let sA=scope(Math.atan2(sY,sX),tau);              // Calculate separation angle using trigonometry
+                      if (scope(sA-p[i].phi,tau)<pi) p[i].R++;          // Particle j is to the right of i
+                      else p[i].L++;                                    // Particle j is to the left of i
+                      if (scope(sA-p[j].phi,tau)>pi) p[j].R++;          // Particle i is to the right of j
+                      else p[j].L++;                                    // Particle i is to the left of j
+                    }
+                  }
+                }
+              }
             }
           }
         }
       }
-      
-      // delta_phi = alpha + beta × N × sign(R - L)
-      let deltaPhi=a+(b*p[i][3]*Math.sign(p[i][5]-p[i][4]));
-      
-      // Turn right delta_phi
-      p[i][2]=scope(p[i][2]+deltaPhi,tau);
-    }
-  } else if (method==2) {
-    // Here's where I need to code a faster, grid-based method for calculating all the changes in orientation
-    for (i=0; i<n; i++) {
-      <!-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~  // Do this -->
-      <!-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~  // Do that -->
-      <!-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~  // Do the other -->
-      
-      // delta_phi = alpha + beta × N × sign(R - L)
-      let deltaPhi=a+(b*p[i][3]*Math.sign(p[i][5]-p[i][4]));
-      
-      // Turn right delta_phi
-      p[i][2]=scope(p[i][2]+deltaPhi,tau);
     }
   }
-    
+  
   // Clear HTML canvas (or leave trails)
   context.fillStyle='rgba(0,0,0,'+o+')';
   context.fillRect(0,0,vw,vh);
   
-  // Ppsition particles
+  // Position particles
   for (i=0; i<n; i++) {
-    if (hist[p[i][3]]===undefined) hist[p[i][3]]=0;
-    else hist[p[i][3]]++;
-        
-    // Select HSL based on number of neighbours
-    let hue=(p[i][3]*7)+90;       // Ranges from green to blue, magenta, red, orange, yellow...
-    hsl='hsl('+hue+',100%,50%)';  // Hue, saturation and lightness
+    if (hist[p[i].N]===undefined) hist[p[i].N]=0;
+    else hist[p[i].N]++;
     
+    // Select HSL based on number of neighbours
+    let hue=(p[i].N*7)+90;
+    hsl='hsl('+hue+',100%,50%)';
+    
+    // Draw particle on HTML canvas
     if (srdpr>2) {
       // Draw a circle
       context.beginPath();
-      context.arc(p[i][0],p[i][1],sr,0,tau);
+      context.arc(p[i].x,p[i].y,sr,0,tau);
       context.fillStyle=hsl;
       context.fill();
       context.closePath();
     } else {
       // Draw a small square
       context.fillStyle=hsl;
-      context.fillRect(p[i][0]-sr,p[i][1]-sr,sr2,sr2);
+      context.fillRect(p[i].x-sr,p[i].y-sr,sr2,sr2);
     }
     
+    // Draw radius, orientation and gamma (r, phi and g)
     if ((n<=500) && (f<=15)) {
-      // Show radii, orientation and gamma
       context.beginPath();
-      context.moveTo(p[i][0],p[i][1]);
-      context.lineTo(p[i][0]+(v*Math.cos(p[i][2])),p[i][1]+(v*Math.sin(p[i][2])));
-      context.strokeStyle='#888';
+      context.moveTo(p[i].x,p[i].y);
+      context.lineTo(p[i].x+(v*Math.cos(p[i].phi)),p[i].y+(v*Math.sin(p[i].phi)));
+      context.strokeStyle='#666';
       context.stroke();
       context.closePath();
       context.beginPath();
-      context.arc(p[i][0],p[i][1],r,0,tau);
-      context.strokeStyle='rgba(255,255,255,'+(100/(n*f))+')';
+      context.arc(p[i].x,p[i].y,r,0,tau);
+      context.strokeStyle='rgba(255,255,255,'+(50/(n*f))+')';
       context.stroke();
       context.closePath();
     }
+    
+    // delta_phi = alpha + beta × N × sign(R - L)
+    let delta_phi=a+(b*p[i].N*Math.sign(p[i].R-p[i].L));
+    
+    // Turn right delta_phi
+    p[i].phi=scope(p[i].phi+delta_phi,tau);
     
     // Move forward v
-    p[i][0]+=(v*Math.cos(p[i][2]));  // X coordinate
-    p[i][1]+=(v*Math.sin(p[i][2]));  // Y coordinate
+    p[i].x+=(v*Math.cos(p[i].phi));
+    p[i].y+=(v*Math.sin(p[i].phi));
     
     // Wrap screen edges, Pac-Man style
-    p[i][0]=scope(p[i][0]+sr2,vwsr4)-sr2;  // X coordinate
-    p[i][1]=scope(p[i][1]+sr2,vhsr4)-sr2;  // Y coordinate
+    p[i].x=scope(p[i].x+sr2,vwsr4)-sr2;
+    p[i].y=scope(p[i].y+sr2,vhsr4)-sr2;
     
     // Reset values of N, L and R
-    p[i][3]=0, p[i][4]=0, p[i][5]=0;
+    p[i].N=0, p[i].L=0, p[i].R=0;
   }
   
-  // Log metrics
-  histogram();
-  // let ms=elapsed+(new Date().getTime()-time), fps=Math.round(((count*1000)/ms)*10)/10; console.log(count+' cycles, '+ms+'ms ('+fps+'fps)');
+  // Analytics
+  // framespersecond();
+  // histogram();
+}
+
+function framespersecond() {
+  let ms=elapsed+(new Date().getTime()-time);
+  let fps=Math.round(((count*1000)/ms)*10)/10;
+  console.log('Method '+method+':\n'+count+' cycles, '+ms+'ms ('+fps+'fps)');
 }
 
 function histogram() {
   if (eval(hist.length)>hl) hl=hist.length;
-  let col=vw/hl, scale=10;
+  let col=vw/hl, scale=10, ave=0;
   for (i=0; i<hl; i++) if (hist[i]>0) {
+    ave=ave+(hist[i]*i);
     let bar=Math.sqrt(hist[i])*scale;
     context.fillStyle='hsla('+((i*7)+90)+',100%,25%,'+(50*o)+'%)';
     context.fillRect(i*col,vh-bar,col,bar);
   }
+  ave=Math.round((ave/n)*100)/100;
+  console.log('Density (d):'+Math.round(d*z*z*100)/100+'\nAverage (N):'+ave);
 }
 
 // Ensure values are between 0 and max
@@ -336,9 +360,9 @@ function change(id,value) {
   else if (id=='number') { n=value; setvr(); document.getElementById("num").innerHTML=n; }
   else if (id=='density') { d=value; scale; setvr(); document.getElementById("den").innerHTML=Math.round(d*z*z*100); }
   else if (id=='trails') o=1-value;
-  else if (id=='size') s=value, sr=s*r, sr2=sr*2, vwsr4=vw+(sr*4), vhsr4=vh+(sr*4), srdpr=sr*dpr;
+  else if (id=='size') s=value, sr=s*r, sr2=sr*2, sr4=sr*4, vwsr4=vw+sr4, vhsr4=vh+sr4, srdpr=sr*dpr;
   else if (id=='framerate') { f=value; document.getElementById("rate").innerHTML=f; }
-  if ((id=='alpha') || (id=='beta') || (id=='gamma')) { label='&emsp;'; showabg(); }
+  if ((id=='alpha') || (id=='beta') || (id=='gamma')) { caption='&emsp;'; showabg(); }
   if (paused) step();
   else if (id=='framerate') { window.clearTimeout(run); run=setInterval(step,1000/f); }
 }
@@ -347,7 +371,7 @@ function change(id,value) {
 function link(env) {
   let href=window.location;
   href=href.protocol+href.pathname+href.hostname+'?';
-  if (label!='&emsp;') href+=demo;
+  if (caption!='&emsp;') href+=demo;
   else {
     href+=Math.round((a/pi)*180)+','+Math.round((b/pi)*180)+','+g;
     if (env) href+=','+n+','+d+','+s+','+o+','+f+','+dist;
@@ -361,6 +385,7 @@ function link(env) {
 body { background:#000; font-family:Roboto; font-weight:200; text-shadow:0 0.1vh 0.2vh #000, 0 0.1vh 0.2vh #000; overflow:hidden; }
 nobr { white-space:nowrap; display:inline-block; }
 #info { cursor:pointer; font-size:calc(7vmin - 2.3vw); line-height:1.75em; color:#AAA; padding:3vh; position:fixed; top:0vmin; left:0vmin; z-index:2; }
+.break { margin-top:calc(4.5vh - 4.5vmin); }
 #settings { cursor:pointer; font-size:2.5vh; color:#AAA; padding:3vh; position:fixed; bottom:0vmin; left:0vmin; z-index:3; }
 #controls { padding:4.5vh 0 1.5vh 0; width:45.15vh; height:100vh; background:rgba(48,48,48,0.9); border-left:0.1vh solid #000; text-align:center; position:absolute; top:0; right:-45vh; z-index:2; transition:right 0.25s; }
 #controls:hover { right:0 !important; }
