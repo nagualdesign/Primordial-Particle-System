@@ -307,7 +307,7 @@ function step() {
     p[i].x+=(v*p[i].pCos);
     p[i].y+=(v*p[i].pSin);
     
-    // p[i].x+=5, p[i].y+5;  // Drift (test edge wrapping)
+    // p[i].x+=5, p[i].y+=2.5;  // Drift (test edge wrapping)
     
     // Wrap screen edges, Pac-Man style
     p[i].x=scope(p[i].x,vw);
@@ -326,12 +326,21 @@ function step() {
   // histogram();
 }
 
+// Ensure values are between 0 and max
+function scope(val,max) {
+  if (val>=max) val=val%max;
+  else if (val<0) val=max+(val%max);
+  return val;
+}
+
+// Log frame rate in console
 function framesPerSecond() {
   let ms=elapsed+(new Date().getTime()-time);
   let fps=Math.round(((count*1000)/ms)*10)/10;
-  console.log('Method '+method+':\n'+count+' cycles, '+ms+'ms ('+fps+'fps)');
+  console.log(count+' cycles, '+ms+'ms ('+fps+'fps)');
 }
 
+// Display histogram of N values
 function histogram() {
   if (eval(hist.length)>hl) hl=hist.length;
   let col=vw/hl, ave=0;
@@ -343,13 +352,6 @@ function histogram() {
   }
   ave=Math.round((ave/n)*100)/100;
   console.log('Density (d):'+Math.round(d*z*z*100)/100+'\nAverage (N):'+ave);
-}
-
-// Ensure values are between 0 and max
-function scope(val,max) {
-  if (val>=max) val=val%max;
-  else if (val<0) val=max+(val%max);
-  return val;
 }
 
 // Cycle through species presets
