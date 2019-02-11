@@ -113,7 +113,7 @@ function sliders() {
   document.getElementById("number").value=n;
   document.getElementById("num").innerHTML=n;
   document.getElementById("density").value=d;
-  document.getElementById("den").innerHTML=Math.round(d*z*z*100);
+  document.getElementById("den").innerHTML=Math.round(d*z*z*100)/100;
   document.getElementById("size").value=s;
   document.getElementById("trails").value=1-o;
   document.getElementById("framerate").value=f;
@@ -157,28 +157,31 @@ function playPause() {
   }
 }
 
+// Create particle
 function Particle() {
   if (dist==0) {
-    // Set uniform distribution
+    // Uniform distribution
     this.x=Math.random()*vw;
     this.y=Math.random()*vh;
   } else if (dist==1) {
-    // Set centre-weighted distribution
+    // Centre-weighted distribution
     let mx=Math.max(0,(vw-vh)/2), my=Math.max(0,(vh-vw)/2), min=Math.min(vw,vh);
     this.x=mx+((Math.random()+Math.random()+Math.random())/3)*min;
     this.y=my+((Math.random()+Math.random()+Math.random())/3)*min;
   }
-  this.phi=Math.random()*tau;  // Set random orientation
-  this.N=0;                    // Number of neighbours
-  this.L=0;                    // Neighbours on left
-  this.R=0;                    // Neighbours on right
+  this.phi=Math.random()*tau;    // Set random orientation
+  this.pSin=Math.sin(this.phi);  // Sine of phi
+  this.pCos=Math.cos(this.phi);  // Cosine of phi
+  this.N=0;                      // Number of neighbours
+  this.L=0;                      // Neighbours on left
+  this.R=0;                      // Neighbours on right
 }
 
 // Set scale of viewport, canvas and particles
 function scale() {
   // Screen dimensions
-  vw=window.innerWidth, vh=window.innerHeight;     // Viewport dimensions (CSS pixels)
-  vw2=vw/2, vh2=vh/2;
+  vw=window.innerWidth, vw2=vw/2;                  // Viewport width (CSS pixels)
+  vh=window.innerHeight, vh2=vh/2;                 // Viewport height (CSS pixels)
   z=Math.round(((window.outerWidth-8)/vw)*20)/20;  // Browser zoom level (desktop)
   dpr=Math.round(window.devicePixelRatio*20)/20;   // Device Pixel Ratio (mobile)
   cw=(vw*dpr), ch=(vh*dpr);                        // HTML canvas dimensions
@@ -208,44 +211,46 @@ function setvr() {
 // Advance simulation by one step (this function is called f times per second)
 function step() {
   count++; hist=new Array(); hl-=0.5*(hl/f);
-  let xCells=Math.floor(vw/r), xSize=vw/xCells;
-  let yCells=Math.floor(vh/r), ySize=vh/yCells;
   
   // Destroy and remake grid each frame
+  let xCells=Math.floor(vw/r), xSize=vw/xCells;
+  let yCells=Math.floor(vh/r), ySize=vh/yCells;
   let grid=new Array(xCells);
   for (i=0;i<xCells;i++) {
     grid[i]=new Array(yCells);
     for (ii=0;ii<yCells;ii++) grid[i][ii]=new Array;
   }
   
-  // Insert every particles index into a grid cell
   for (i=0; i<n; i++) {
+    // Insert particle index into a grid cell
     let xg=Math.floor(p[i].x/xSize);
     let yg=Math.floor(p[i].y/ySize);
     grid[xg][yg].push(i);
+    // Calculate sine and cosine of phi
+    p[i].pSin=Math.sin(p[i].phi);
+    p[i].pCos=Math.cos(p[i].phi);
   }
   
   // Count neighbours (N, L and R values) for each particle
-  for (xg=0; xg<xCells; xg++) {							                 // Step through the grid cells (left to right)
-    for (yg=0; yg<yCells; yg++) {                            // Step through the grid cells (top to bottom)
-      for (gp=0; gp<grid[xg][yg].length; gp++) {		         // Step through the particles in each grid
-        let i=grid[xg][yg][gp];                              // Now we have a particle index and we're already in the right grid
-        for (xc=xg-1; xc<xg+2; xc++) {                       // Iterate through the 9 neighbour cells (left to right)
-          for (yc=yg-1; yc<yg+2; yc++) {                     // Iterate through the 9 neighbour cells (top to bottom)
-            let sxc=scope(xc,xCells), syc=scope(yc,yCells);  // Wrap screen edges, Pac-Man style
-            for (jp=0; jp<grid[sxc][syc].length; jp++) {     // Iterate through the particles in each cell			
-              let j=grid[sxc][syc][jp];                      // Finally we have both i & j
-              if (i<j) {                                     // Still not gonna check it twice
-                let sX=scope(p[j].x-p[i].x+vw2,vw)-vw2;      // Calculate x-axis separation
-                let sY=scope(p[j].y-p[i].y+vh2,vh)-vh2;      // Calculate y-axis separation
-                let sD=(sX*sX)+(sY*sY);                      // Calculate the square of the separation distance
-                if (sD<r2) {                                 // If separation distance is less than r
-                  p[i].N++, p[j].N++;                        // Increase total neighbour counts
-                  let sA=Math.atan2(sY,sX);                  // Calculate separation angle using trigonometry
-                  if (scope(sA-p[i].phi,tau)<pi) p[i].R++;   // Particle j is to the right of i
-                  else p[i].L++;                             // Particle j is to the left of i
-                  if (scope(sA-p[j].phi,tau)>pi) p[j].R++;   // Particle i is to the right of j
-                  else p[j].L++;                             // Particle i is to the left of j
+  for (xg=0; xg<xCells; xg++) {							                  // Step through the grid cells (left to right)
+    for (yg=0; yg<yCells; yg++) {                             // Step through the grid cells (top to bottom)
+      for (gp=0; gp<grid[xg][yg].length; gp++) {		          // Step through the particles in each grid
+        let i=grid[xg][yg][gp];                               // Now we have a particle index and we're already in the right grid
+        for (xc=xg-1; xc<xg+2; xc++) {                        // Iterate through the 9 neighbour cells (left to right)
+          for (yc=yg-1; yc<yg+2; yc++) {                      // Iterate through the 9 neighbour cells (top to bottom)
+            let sxc=scope(xc,xCells), syc=scope(yc,yCells);   // Wrap screen edges, Pac-Man style
+            for (jp=0; jp<grid[sxc][syc].length; jp++) {      // Iterate through the particles in each cell			
+              let j=grid[sxc][syc][jp];                       // Finally we have both i & j
+              if (i<j) {                                      // Still not gonna check it twice
+                let sX=scope(p[j].x-p[i].x+vw2,vw)-vw2;       // Calculate x-axis separation
+                let sY=scope(p[j].y-p[i].y+vh2,vh)-vh2;       // Calculate y-axis separation
+                let sD=(sX*sX)+(sY*sY);                       // Calculate the square of the separation distance
+                if (sD<r2) {                                  // If separation distance is less than r
+                  p[i].N++, p[j].N++;                         // Increase total neighbour counts
+                  if (sX*p[i].pSin-sY*p[i].pCos<0) p[i].R++;  // Particle j is to the right of i
+                  else p[i].L++;                              // Particle j is to the left of i
+                  if (sX*p[j].pSin-sY*p[j].pCos>0) p[j].R++;  // Particle i is to the right of j
+                  else p[j].L++;                              // Particle i is to the left of j
                 }
               }
             }
@@ -299,8 +304,8 @@ function step() {
     p[i].phi=scope(p[i].phi+delta_phi,tau);               // Turn right delta_phi
     
     // Move forward v
-    p[i].x+=(v*Math.cos(p[i].phi));
-    p[i].y+=(v*Math.sin(p[i].phi));
+    p[i].x+=(v*p[i].pCos);
+    p[i].y+=(v*p[i].pSin);
     
     // p[i].x+=5, p[i].y+5;  // Drift (test edge wrapping)
     
@@ -360,7 +365,7 @@ function change(id,value) {
   else if (id=='beta') b=(value/180)*pi;
   else if (id=='gamma') { g=value, v=g*r; }
   else if (id=='number') { n=value; setvr(); document.getElementById("num").innerHTML=n; }
-  else if (id=='density') { d=value; scale; setvr(); document.getElementById("den").innerHTML=Math.round(d*z*z*100); }
+  else if (id=='density') { d=value; scale; setvr(); document.getElementById("den").innerHTML=Math.round(d*z*z*100)/100; }
   else if (id=='trails') o=1-value;
   else if (id=='size') s=value, sr=s*r, sr2=sr*2, sr4=sr*4, vwsr4=vw+sr4, vhsr4=vh+sr4, srdpr=sr*dpr;
   else if (id=='framerate') { f=value; document.getElementById("rate").innerHTML=f; }
@@ -422,7 +427,7 @@ input[type=button] { margin:0.5vh 0; width:16vh; height:3vh; font-size:1.8vh; cu
     <h2 onClick="link(1);">Environmental controls</h2>
     <p>Number of particles (<span id="num"></span>)<br />
       <input id="number" type="range" min="100" max="10000" step="100" onInput="change(this.id,this.value);" /><br />
-      Particle density (<span id="den"></span>%)<br />
+      Particle density (<span id="den"></span>)<br />
       <input id="density" type="range" min="1" max="50" step="1" onInput="change(this.id,this.value);" /><br />
       Particle size<br />
       <input id="size" type="range" min="0.05" max="0.5" step="0.025" onInput="change(this.id,this.value);" /><br />
