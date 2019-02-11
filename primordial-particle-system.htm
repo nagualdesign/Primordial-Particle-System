@@ -24,7 +24,7 @@
 const pi=Math.PI, tau=2*pi;                     // Used extensively
 var canvas, context;                            // HTML canvas DOM elements
 var p, a, b, g, caption, demo=0;                // Particle parameters
-var vw, vh, z, dpr, cw, ch;                     // Viewport and HTML canvas
+var vw, vw2, vh, vh2, z, dpr, cw, ch;           // Viewport and HTML canvas
 var r, r2, v, sr, sr2, vwsr4, vhsr4, srdrp;     // Used extensively
 var count, elapsed, time, dist=0, paused=true;  // Simulation parameters
 var hist, hl=0;                                 // Analytics
@@ -178,6 +178,7 @@ function Particle() {
 function scale() {
   // Screen dimensions
   vw=window.innerWidth, vh=window.innerHeight;     // Viewport dimensions (CSS pixels)
+  vw2=vw/2, vh2=vh/2;
   z=Math.round(((window.outerWidth-8)/vw)*20)/20;  // Browser zoom level (desktop)
   dpr=Math.round(window.devicePixelRatio*20)/20;   // Device Pixel Ratio (mobile)
   cw=(vw*dpr), ch=(vh*dpr);                        // HTML canvas dimensions
@@ -207,9 +208,8 @@ function setvr() {
 // Advance simulation by one step (this function is called f times per second)
 function step() {
   count++; hist=new Array(); hl-=0.5*(hl/f);
-  let gridCellSize=r;
-  let xCells=Math.ceil(vwsr4/gridCellSize)+1;
-  let yCells=Math.ceil(vhsr4/gridCellSize)+1;
+  let xCells=Math.ceil(vw/r), xSize=vw/xCells;
+  let yCells=Math.ceil(vh/r), ySize=vh/yCells;
   
   // Destroy and remake grid each frame
   let grid=new Array(xCells);
@@ -219,32 +219,33 @@ function step() {
   }
   
   // Insert every particles index into a grid cell
-  for (i=0; i<n; i++) grid[Math.floor((p[i].x+sr4)/gridCellSize)][Math.floor((p[i].y+sr4)/gridCellSize)].push(i);
+  for (i=0; i<n; i++) {
+    let xg=Math.floor(p[i].x/xSize);
+    let yg=Math.floor(p[i].y/ySize);
+    grid[xg][yg].push(i);
+  }
   
-  // Calculate and apply changes in orientation
-  for (xg=0; xg<xCells; xg++) {							                            // Step through the grid cells (left to right)
-    for (yg=0; yg<yCells; yg++) {                                       // Step through the grid cells (top to bottom)
-      for (gp=0; gp<grid[xg][yg].length; gp++) {		                    // Step through the particles in each grid
-        let i=grid[xg][yg][gp];                                         // Now we have a particle index and we're already in the right grid
-        for (xc=Math.max(0,xg-1); xc<Math.min(xg+2, xCells); xc++) {    // Iterate through the 8 neighbour cells (left to right)
-          for (yc=Math.max(0,yg-1); yc<Math.min(yg+2, yCells); yc++) {  // Iterate through the 8 neighbour cells (top to bottom)
-            for (jp=0; jp<grid[xc][yc].length; jp++) {                  // Iterate through the particles in each cell			
-              let j=grid[xc][yc][jp];                                   // Finally we have both i & j
-              if (i<j) {                                                // Still not gonna check it twice
-                let sX=p[j].x-p[i].x;                                   // Calculate x-axis separation
-                if (Math.abs(sX)<r) {                                   // Only if x-axis separation is less than r
-                  let sY=p[j].y-p[i].y;                                 // Calculate y-axis separation
-                  if (Math.abs(sY)<r) {                                 // Only if y-axis separation is also less than r
-                    let sD=(sX*sX)+(sY*sY);                             // Calculate the square of the separation distance
-                    if (sD<r2) {                                        // Only if separation distance is also less than r
-                      p[i].N++, p[j].N++;                               // Increase total neighbour counts
-                      let sA=scope(Math.atan2(sY,sX),tau);              // Calculate separation angle using trigonometry
-                      if (scope(sA-p[i].phi,tau)<pi) p[i].R++;          // Particle j is to the right of i
-                      else p[i].L++;                                    // Particle j is to the left of i
-                      if (scope(sA-p[j].phi,tau)>pi) p[j].R++;          // Particle i is to the right of j
-                      else p[j].L++;                                    // Particle i is to the left of j
-                    }
-                  }
+  // Count neighbours (N, L and R values) for each particle
+  for (xg=0; xg<xCells; xg++) {							                 // Step through the grid cells (left to right)
+    for (yg=0; yg<yCells; yg++) {                            // Step through the grid cells (top to bottom)
+      for (gp=0; gp<grid[xg][yg].length; gp++) {		         // Step through the particles in each grid
+        let i=grid[xg][yg][gp];                              // Now we have a particle index and we're already in the right grid
+        for (xc=xg-1; xc<xg+2; xc++) {                       // Iterate through the 9 neighbour cells (left to right)
+          for (yc=yg-1; yc<yg+2; yc++) {                     // Iterate through the 9 neighbour cells (top to bottom)
+            let sxc=scope(xc,xCells), syc=scope(yc,yCells);  // Wrap screen edges, Pac-Man style
+            for (jp=0; jp<grid[sxc][syc].length; jp++) {     // Iterate through the particles in each cell			
+              let j=grid[sxc][syc][jp];                      // Finally we have both i & j
+              if (i<j) {                                     // Still not gonna check it twice
+                let sX=scope(p[j].x-p[i].x+vw2,vw)-vw2;      // Calculate x-axis separation
+                let sY=scope(p[j].y-p[i].y+vh2,vh)-vh2;      // Calculate y-axis separation
+                let sD=(sX*sX)+(sY*sY);                      // Calculate the square of the separation distance
+                if (sD<r2) {                                 // If separation distance is less than r
+                  p[i].N++, p[j].N++;                        // Increase total neighbour counts
+                  let sA=Math.atan2(sY,sX);                  // Calculate separation angle using trigonometry
+                  if (scope(sA-p[i].phi,tau)<pi) p[i].R++;   // Particle j is to the right of i
+                  else p[i].L++;                             // Particle j is to the left of i
+                  if (scope(sA-p[j].phi,tau)>pi) p[j].R++;   // Particle i is to the right of j
+                  else p[j].L++;                             // Particle i is to the left of j
                 }
               }
             }
@@ -260,9 +261,6 @@ function step() {
   
   // Position particles
   for (i=0; i<n; i++) {
-    if (hist[p[i].N]===undefined) hist[p[i].N]=0;
-    else hist[p[i].N]++;
-    
     // Select HSL based on number of neighbours
     let hue=(p[i].N*7)+90;
     hsl='hsl('+hue+',100%,50%)';
@@ -296,30 +294,34 @@ function step() {
       context.closePath();
     }
     
-    // delta_phi = alpha + beta × N × sign(R - L)
-    let delta_phi=a+(b*p[i].N*Math.sign(p[i].R-p[i].L));
-    
-    // Turn right delta_phi
-    p[i].phi=scope(p[i].phi+delta_phi,tau);
+    // Apply changes in orientation
+    let delta_phi=a+(b*p[i].N*Math.sign(p[i].R-p[i].L));  // delta_phi = alpha + beta × N × sign(R - L)
+    p[i].phi=scope(p[i].phi+delta_phi,tau);               // Turn right delta_phi
     
     // Move forward v
     p[i].x+=(v*Math.cos(p[i].phi));
     p[i].y+=(v*Math.sin(p[i].phi));
     
+    // p[i].x+=5, p[i].y+5;  // Drift (test edge wrapping)
+    
     // Wrap screen edges, Pac-Man style
-    p[i].x=scope(p[i].x+sr2,vwsr4)-sr2;
-    p[i].y=scope(p[i].y+sr2,vhsr4)-sr2;
+    p[i].x=scope(p[i].x,vw);
+    p[i].y=scope(p[i].y,vh);
+    
+    // Append histogram data
+    if (hist[p[i].N]!==undefined) hist[p[i].N]++;
+    else hist[p[i].N]=0;
     
     // Reset values of N, L and R
     p[i].N=0, p[i].L=0, p[i].R=0;
   }
   
   // Analytics
-  // framespersecond();
+  // framesPerSecond();
   // histogram();
 }
 
-function framespersecond() {
+function framesPerSecond() {
   let ms=elapsed+(new Date().getTime()-time);
   let fps=Math.round(((count*1000)/ms)*10)/10;
   console.log('Method '+method+':\n'+count+' cycles, '+ms+'ms ('+fps+'fps)');
@@ -327,20 +329,20 @@ function framespersecond() {
 
 function histogram() {
   if (eval(hist.length)>hl) hl=hist.length;
-  let col=vw/hl, scale=10, ave=0;
+  let col=vw/hl, ave=0;
   for (i=0; i<hl; i++) if (hist[i]>0) {
     ave=ave+(hist[i]*i);
-    let bar=Math.sqrt(hist[i])*scale;
+    let bar=Math.sqrt(hist[i]/n)*vh2;
     context.fillStyle='hsla('+((i*7)+90)+',100%,25%,'+(50*o)+'%)';
     context.fillRect(i*col,vh-bar,col,bar);
   }
-  ave=Math.round((ave/n)*100)/100;
-  console.log('Density (d):'+Math.round(d*z*z*100)/100+'\nAverage (N):'+ave);
+  // ave=Math.round((ave/n)*100)/100;
+  // console.log('Density (d):'+Math.round(d*z*z*100)/100+'\nAverage (N):'+ave);
 }
 
 // Ensure values are between 0 and max
 function scope(val,max) {
-  if (val>max) val=val%max;
+  if (val>=max) val=val%max;
   else if (val<0) val=max+(val%max);
   return val;
 }
