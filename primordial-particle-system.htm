@@ -208,8 +208,8 @@ function setvr() {
 // Advance simulation by one step (this function is called f times per second)
 function step() {
   count++; hist=new Array(); hl-=0.5*(hl/f);
-  let xCells=Math.ceil(vw/r), xSize=vw/xCells;
-  let yCells=Math.ceil(vh/r), ySize=vh/yCells;
+  let xCells=Math.floor(vw/r), xSize=vw/xCells;
+  let yCells=Math.floor(vh/r), ySize=vh/yCells;
   
   // Destroy and remake grid each frame
   let grid=new Array(xCells);
@@ -336,8 +336,8 @@ function histogram() {
     context.fillStyle='hsla('+((i*7)+90)+',100%,25%,'+(50*o)+'%)';
     context.fillRect(i*col,vh-bar,col,bar);
   }
-  // ave=Math.round((ave/n)*100)/100;
-  // console.log('Density (d):'+Math.round(d*z*z*100)/100+'\nAverage (N):'+ave);
+  ave=Math.round((ave/n)*100)/100;
+  console.log('Density (d):'+Math.round(d*z*z*100)/100+'\nAverage (N):'+ave);
 }
 
 // Ensure values are between 0 and max
