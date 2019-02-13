@@ -27,7 +27,7 @@ var p, a, b, g, caption, demo=0;                // Particle parameters
 var vw, vw2, vh, vh2, z, dpr, cw, ch;           // Viewport and HTML canvas
 var r, r2, v, sr, sr2, vwsr4, vhsr4, srdrp;     // Used extensively
 var count, elapsed, time, dist=0, paused=true;  // Simulation parameters
-var hist, hl=0;                                 // Analytics
+var hist, hl=0, analyse=false;                  // Analytics
 
 // Default settings
 var n=600;  // Number of particles (100 to 10,000)
@@ -83,10 +83,10 @@ function initialize() {
 function species(abg) {
   caption='&emsp;';
   if (arguments.length==0) {
-    // Randomize values (360 × 120 × 100 = 4,320,000 possible values!)
-    a=Math.round(Math.random()*360)-180;  // Alpha (-180° to +180°)
-    b=Math.round(Math.random()*180)-90;   // Beta (-90° to +90°)
-    g=Math.ceil(Math.random()*100)/200;   // Gamma (0.005 to 0.500)
+    // Randomize values (3600 × 1800 × 500 = 3.24 billion possible values!)
+    a=Math.round(Math.random()*3600)/10-180;  // Alpha (-180.0° to +180.0°)
+    b=Math.round(Math.random()*1800)/10-90;   // Beta (-90.0° to +90.0°)
+    g=Math.ceil(Math.random()*500)/1000;   // Gamma (0.001 to 0.500)
   } else if (arguments.length==1) {
     // Use preset values
     let pre=preset[abg];
@@ -107,8 +107,8 @@ function species(abg) {
 
 // Apply settings to control sliders
 function sliders() {
-  document.getElementById("alpha").value=Math.round((a/pi)*180);
-  document.getElementById("beta").value=Math.round((b/pi)*180);
+  document.getElementById("alpha").value=Math.round((a/pi)*1800)/10;
+  document.getElementById("beta").value=Math.round((b/pi)*1800)/10;
   document.getElementById("gamma").value=g;
   document.getElementById("number").value=n;
   document.getElementById("num").innerHTML=n;
@@ -123,7 +123,7 @@ function sliders() {
 // Display current settings
 function showabg() {
   document.getElementById("info").innerHTML=caption;
-  let sHTML='α&thinsp;'+Math.round((a/pi)*180)+'°&emsp;β&thinsp;'+Math.round((b/pi)*180)+'°&emsp;γ&thinsp;'+g;
+  let sHTML='α&thinsp;'+Math.round((a/pi)*1800)/10+'°&emsp;β&thinsp;'+Math.round((b/pi)*1800)/10+'°&emsp;γ&thinsp;'+g;
   document.getElementById("settings").innerHTML=sHTML;
 }
 
@@ -153,7 +153,7 @@ function playPause() {
     elapsed+=(new Date().getTime()-time);
     document.getElementById("controls").style.right='0';
     window.clearTimeout(run);
-    histogram();
+    if (analyse) histogram();
   }
 }
 
@@ -210,9 +210,9 @@ function setvr() {
 
 // Advance simulation by one step (this function is called f times per second)
 function step() {
-  count++; hist=new Array(); hl-=0.5*(hl/f);
+  count++; hist=new Array(); hl-=0.25*(hl/f);
   
-  // Destroy and remake grid each frame
+  // Create new grid
   let xCells=Math.floor(vw/r), xSize=vw/xCells;
   let yCells=Math.floor(vh/r), ySize=vh/yCells;
   let grid=new Array(xCells);
@@ -264,11 +264,11 @@ function step() {
   context.fillStyle='rgba(0,0,0,'+o+')';
   context.fillRect(0,0,vw,vh);
   
-  // Position particles
+  // Draw particles then apply formula
   for (i=0; i<n; i++) {
     // Select HSL based on number of neighbours
     let hue=(p[i].N*7)+90;
-    hsl='hsl('+hue+',100%,50%)';
+    let hsl='hsl('+hue+',100%,50%)';
     
     // Draw particle on HTML canvas
     if (srdpr>2) {
@@ -314,16 +314,20 @@ function step() {
     p[i].y=scope(p[i].y,vh);
     
     // Append histogram data
-    if (hist[p[i].N]!==undefined) hist[p[i].N]++;
-    else hist[p[i].N]=0;
+    if (analyse) {
+      if (hist[p[i].N]!==undefined) hist[p[i].N]++;
+      else hist[p[i].N]=0;
+    }
     
     // Reset values of N, L and R
     p[i].N=0, p[i].L=0, p[i].R=0;
   }
   
   // Analytics
-  // framesPerSecond();
-  // histogram();
+  if (analyse) {
+    // framesPerSecond();
+    histogram();
+  }
 }
 
 // Ensure values are between 0 and max
@@ -342,16 +346,30 @@ function framesPerSecond() {
 
 // Display histogram of N values
 function histogram() {
+  ave=0;
   if (eval(hist.length)>hl) hl=hist.length;
-  let col=vw/hl, ave=0;
-  for (i=0; i<hl; i++) if (hist[i]>0) {
-    ave=ave+(hist[i]*i);
-    let bar=Math.sqrt(hist[i]/n)*vh2;
-    context.fillStyle='hsla('+((i*7)+90)+',100%,25%,'+(50*o)+'%)';
-    context.fillRect(i*col,vh-bar,col,bar);
+  context.save();
+  if (vw>vh) {
+    context.translate(0,vh);
+    context.rotate(pi*1.5);
+    var col=vw/hl, bh=vh2;
+  } else {
+    var col=vh/hl, bh=vw2;
   }
-  ave=Math.round((ave/n)*100)/100;
-  console.log('Density (d):'+Math.round(d*z*z*100)/100+'\nAverage (N):'+ave);
+  for (i=0; i<hl; i++) if (hist[i]>0) {
+    let hue=(i*7)+90;
+    let bar=Math.sqrt(hist[i]/n)*bh;
+    context.fillStyle='hsla('+hue+',100%,25%,'+(50*o)+'%)';
+    context.fillRect(0,i*col,bar,col);
+    if ((hist[i]>hist[i-1]) && (hist[i]>hist[i+1])) {
+      context.font=(col*2)+'px Roboto';
+      context.fillStyle='hsla('+hue+',50%,50%,'+(50*o)+'%)';
+      context.fillText(i,bar+(col*0.1),(i+1.2)*col);
+    }
+  }
+  context.restore();
+  
+  // console.log('Density:'+Math.round(d*z*z*100)/100+'\nAverage N:'+Math.round((ave/n)*100)/100);
 }
 
 // Cycle through species presets
@@ -382,7 +400,7 @@ function link(env) {
   href=href.protocol+href.pathname+href.hostname+'?';
   if (caption!='&emsp;') href+=demo;
   else {
-    href+=Math.round((a/pi)*180)+','+Math.round((b/pi)*180)+','+g;
+    href+=Math.round((a/pi)*1800)/10+','+Math.round((b/pi)*1800)/10+','+g;
     if (env) href+=','+n+','+d+','+s+','+o+','+f+','+dist;
   }
   window.open(href,'_self');
@@ -421,16 +439,16 @@ input[type=button] { margin:0.5vh 0; width:16vh; height:3vh; font-size:1.8vh; cu
       <a href="https://www.youtube.com/watch?v=makaJpLvbow" target="youtube">&nbsp;»&thinsp;Watch the YouTube video&thinsp;«&nbsp;</a></p>
     <h2 onClick="link(0);">Species parameters</h2>
     <p>Alpha (intrinsic turning angle)<br />
-      <input id="alpha" type="range" min="-180" max="180" step="1" onInput="change(this.id,this.value);" /><br />
+      <input id="alpha" type="range" min="-180" max="180" step="0.1" onInput="change(this.id,this.value);" /><br />
       Beta (reactive turning angle)<br />
-      <input id="beta" type="range" min="-90" max="90" step="1" onInput="change(this.id,this.value);" /><br />
+      <input id="beta" type="range" min="-90" max="90" step="0.1" onInput="change(this.id,this.value);" /><br />
       Gamma (step size)<br />
-      <input id="gamma" type="range" min="0.005" max="0.5" step="0.005" onInput="change(this.id,this.value);" /></p>
+      <input id="gamma" type="range" min="0.001" max="0.5" step="0.001" onInput="change(this.id,this.value);" /></p>
     <h2 onClick="link(1);">Environmental controls</h2>
     <p>Number of particles (<span id="num"></span>)<br />
       <input id="number" type="range" min="100" max="10000" step="100" onInput="change(this.id,this.value);" /><br />
       Particle density (<span id="den"></span>)<br />
-      <input id="density" type="range" min="1" max="50" step="1" onInput="change(this.id,this.value);" /><br />
+      <input id="density" type="range" min="1" max="100" step="1" onInput="change(this.id,this.value);" /><br />
       Particle size<br />
       <input id="size" type="range" min="0.05" max="0.5" step="0.025" onInput="change(this.id,this.value);" /><br />
       Particle trails<br />
@@ -439,6 +457,7 @@ input[type=button] { margin:0.5vh 0; width:16vh; height:3vh; font-size:1.8vh; cu
       <input id="framerate" type="range" min="5" max="100" step="5" onInput="change(this.id,this.value);" /><br />
       Redistribute<br />
       <input type="button" value="Random" onClick="refresh(0);" />&emsp;<input type="button" value="Centre" onClick="refresh(1);" /></p>
+    <p style="cursor:pointer;" onClick="if (analyse) analyse=false; else analyse=true; if (paused) step();" />&emsp;</p>
   </div>
 </body>
 </html>
