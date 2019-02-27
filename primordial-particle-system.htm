@@ -23,11 +23,11 @@
 // Global variables
 const pi=Math.PI, tau=2*pi;                     // Used extensively
 var canvas, context;                            // HTML canvas DOM elements
-var p, a, b, g, caption, demo=0;                // Particle parameters
+var p, a, b, g, caption, demo=0, cs=1, ps=1;    // Particle parameters
 var vw, vw2, vh, vh2, z, dpr, cw, ch;           // Viewport and HTML canvas
 var r, r2, v, sr, sr2, vwsr4, vhsr4, srdrp;     // Used extensively
 var count, elapsed, time, dist=0, paused=true;  // Simulation parameters
-var hist, hl=0, analyse=false;                  // Analytics
+var hist=new Array(), hl=100, analyse=false;    // Analytics
 
 // Default settings
 var n=600;  // Number of particles (100 to 10,000)
@@ -37,15 +37,7 @@ var o=1.0;  // Background opacity (1.0 to 0.1)
 var f=25;   // Maximum frames rate (10 to 100)
 
 // Preset values of alpha, beta and gamma
-var preset=[[10,10,0.2,20,0.5,s,1,5,0,
-    '<nobr>These are called Primordial Particles.</nobr> '+
-    '<nobr>They sense and react to particles nearby.</nobr> '+
-    '<nobr>Their behaviour follows 3 simple rules:</nobr><br />'+
-    '<nobr class="break">At each step they turn by a fixed amount,</nobr> '+
-    '<nobr>then turn away or towards their neighbours,</nobr> '+
-    '<nobr>then move forwards by a fixed amount.</nobr>'],
-  [180,17,0.134,n,d,s,o,15,0,'Some species exhibit cell-like behaviour'],
-  [92,-15,0.125,1000,d,s,0.6,f,0,'Internal contrarotation'],
+var preset=[[180,17,0.134,n,d,s,o,15,0,'Cell-like behaviour'],
   [5,31,0.166,n,2,s,0.1,f,0,'Sprites'],
   [-23,2,0.166,n,10,s,0.6,f,0,'Donuts'],
   [114,-4,0.166,800,d,s,0.4,f,0,'Goblins'],
@@ -77,6 +69,9 @@ function initialize() {
   canvas=document.getElementById("canvas");
   context=canvas.getContext("2d");
   refresh();
+  
+  // Enable keyboard inputs
+  document.addEventListener('keydown',keyboard);
 }
 
 // Set values of alpha, beta and gamma
@@ -153,7 +148,6 @@ function playPause() {
     elapsed+=(new Date().getTime()-time);
     document.getElementById("controls").style.right='0';
     window.clearTimeout(run);
-    if (analyse) histogram();
   }
 }
 
@@ -210,7 +204,14 @@ function setvr() {
 
 // Advance simulation by one step (this function is called f times per second)
 function step() {
-  count++; hist=new Array(); hl-=0.25*(hl/f);
+  if (analyse) {
+    count++;              // Number of iterations
+    hl-=0.005*(hl-100);   // Gradually shorten histograms
+    hist[0]=new Array();  // Number of neighbours (N)
+    hist[1]=new Array();  // Neighbours on left (L)
+    hist[2]=new Array();  // Neighbours on right (R)
+    hist[3]=new Array();  // Grid cell densities
+  }
   
   // Create new grid
   let xCells=Math.floor(vw/r), xSize=vw/xCells;
@@ -218,7 +219,7 @@ function step() {
   let grid=new Array(xCells);
   for (i=0;i<xCells;i++) {
     grid[i]=new Array(yCells);
-    for (ii=0;ii<yCells;ii++) grid[i][ii]=new Array;
+    for (j=0;j<yCells;j++) grid[i][j]=new Array();
   }
   
   for (i=0; i<n; i++) {
@@ -229,6 +230,8 @@ function step() {
     // Calculate sine and cosine of phi
     p[i].pSin=Math.sin(p[i].phi);
     p[i].pCos=Math.cos(p[i].phi);
+    // Reset values of N, L and R
+    p[i].N=0, p[i].L=0, p[i].R=0;
   }
   
   // Count neighbours (N, L and R values) for each particle
@@ -245,7 +248,7 @@ function step() {
                 let sX=scope(p[j].x-p[i].x+vw2,vw)-vw2;       // Calculate x-axis separation
                 let sY=scope(p[j].y-p[i].y+vh2,vh)-vh2;       // Calculate y-axis separation
                 let sD=(sX*sX)+(sY*sY);                       // Calculate the square of the separation distance
-                if (sD<r2) {                                  // If separation distance is less than r
+                if (sD<=r2) {                                 // If separation distance is less than r
                   p[i].N++, p[j].N++;                         // Increase total neighbour counts
                   if (sX*p[i].pSin-sY*p[i].pCos<0) p[i].R++;  // Particle j is to the right of i
                   else p[i].L++;                              // Particle j is to the left of i
@@ -264,41 +267,59 @@ function step() {
   context.fillStyle='rgba(0,0,0,'+o+')';
   context.fillRect(0,0,vw,vh);
   
-  // Draw particles then apply formula
+  // Draw particles on HTML canvas then apply formula
   for (i=0; i<n; i++) {
-    // Select HSL based on number of neighbours
-    let hue=(p[i].N*7)+90;
-    let hsl='hsl('+hue+',100%,50%)';
-    
-    // Draw particle on HTML canvas
-    if (srdpr>2) {
-      // Draw a circle
-      context.beginPath();
-      context.arc(p[i].x,p[i].y,sr,0,tau);
-      context.fillStyle=hsl;
-      context.fill();
-      context.closePath();
-    } else {
-      // Draw a small square
-      context.fillStyle=hsl;
-      context.fillRect(p[i].x-sr,p[i].y-sr,sr2,sr2);
-    }
-    
-    // Draw radius, orientation and gamma (r, phi and g)
-    if ((n<=500) && (f<=15)) {
+    if (ps==0) {
+      // Draw vectors (arrows)
       context.beginPath();
       context.moveTo(p[i].x,p[i].y);
       context.lineTo(p[i].x+(v*Math.cos(p[i].phi)),p[i].y+(v*Math.sin(p[i].phi)));
-      context.strokeStyle='#666';
+      context.lineTo(p[i].x+(v*Math.cos(p[i].phi))+((v*0.25+4)*Math.cos(p[i].phi+3.5)),p[i].y+(v*Math.sin(p[i].phi))+((v*0.25+4)*Math.sin(p[i].phi+3.5)));
+      context.moveTo(p[i].x+(v*Math.cos(p[i].phi)),p[i].y+(v*Math.sin(p[i].phi)));
+      context.lineTo(p[i].x+(v*Math.cos(p[i].phi))+((v*0.25+4)*Math.cos(p[i].phi-3.5)),p[i].y+(v*Math.sin(p[i].phi))+((v*0.25+4)*Math.sin(p[i].phi-3.5)));
+      context.strokeStyle='hsl('+hue(p[i].N)+',100%,50%)';
       context.stroke();
+      context.fillStyle='#FFF';
+      context.fillRect(p[i].x-1,p[i].y-1,2,2);
       context.closePath();
-      context.beginPath();
-      context.arc(p[i].x,p[i].y,r,0,tau);
-      context.strokeStyle='rgba(255,255,255,'+(50/(n*f))+')';
-      context.stroke();
-      context.closePath();
+    } else {
+      // Draw particles
+      if (srdpr>2) {
+        // Draw a circle
+        context.beginPath();
+        context.arc(p[i].x,p[i].y,sr,0,tau);
+        context.fillStyle='hsl('+hue(p[i].N)+',100%,50%)';
+        context.fill();
+        context.closePath();
+      } else {
+        // Draw a small square
+        context.fillStyle='hsl('+hue(p[i].N)+',100%,50%)';
+        context.fillRect(p[i].x-sr,p[i].y-sr,sr2,sr2);
+      }
+      
+      // Draw radius, orientation and gamma (r, phi and g)
+      if ((n<=500) && (f<=15)) {
+        context.beginPath();
+        context.moveTo(p[i].x,p[i].y);
+        context.lineTo(p[i].x+(v*Math.cos(p[i].phi)),p[i].y+(v*Math.sin(p[i].phi)));
+        context.strokeStyle='#666';
+        context.stroke();
+        context.closePath();
+        context.beginPath();
+        context.arc(p[i].x,p[i].y,r,0,tau);
+        context.strokeStyle='rgba(255,255,255,'+(50/(n*f))+')';
+        context.stroke();
+        context.closePath();
+      }
     }
     
+    // Append histogram data
+    if (analyse) {
+      if (hist[0][p[i].N]!==undefined) hist[0][p[i].N]++; else hist[0][p[i].N]=1;
+      if (hist[1][p[i].L]!==undefined) hist[1][p[i].L]++; else hist[1][p[i].L]=1;
+      if (hist[2][p[i].R]!==undefined) hist[2][p[i].R]++; else hist[2][p[i].R]=1;
+    }
+        
     // Apply changes in orientation
     let delta_phi=a+(b*p[i].N*Math.sign(p[i].R-p[i].L));  // delta_phi = alpha + beta × N × sign(R - L)
     p[i].phi=scope(p[i].phi+delta_phi,tau);               // Turn right delta_phi
@@ -307,25 +328,15 @@ function step() {
     p[i].x+=(v*p[i].pCos);
     p[i].y+=(v*p[i].pSin);
     
-    // p[i].x+=5, p[i].y+=2.5;  // Drift (test edge wrapping)
-    
     // Wrap screen edges, Pac-Man style
     p[i].x=scope(p[i].x,vw);
     p[i].y=scope(p[i].y,vh);
-    
-    // Append histogram data
-    if (analyse) {
-      if (hist[p[i].N]!==undefined) hist[p[i].N]++;
-      else hist[p[i].N]=0;
-    }
-    
-    // Reset values of N, L and R
-    p[i].N=0, p[i].L=0, p[i].R=0;
   }
   
   // Analytics
   if (analyse) {
     // framesPerSecond();
+    // orbitals();
     histogram();
   }
 }
@@ -337,6 +348,18 @@ function scope(val,max) {
   return val;
 }
 
+// Select hue based on number of neighbours and colour scheme
+function hue(num) {
+  if (cs==0) { var h=90; }                                                            // 0: Grayscale (green screen)
+  else if (cs==1) { var mult=7.2, off=90, h=scope((num*mult)+off,360); }              // 1: Short scale (wraps at N=50, N=100, N=150.. )
+  else if (cs==2) { var mult=1, off=90, h=scope((num*mult)+off,360); }                // 2: Long scale (wraps at N=360, N=720, N=1080...)
+  else if (cs==3) { var off=90, h=scope(Math.round(Math.log(num)*156.34)+off,360); }  // 3: Log scale (wraps at N=10, N=100, N=1000...)
+  else if (cs==4) { var mult=60/d, off=90, h=scope((num*mult)+off,360); }             // 4: Scales with density (same as short scale @ d=8)
+  else if (cs==5) { var off=240, h=scope((180*num*b/pi)+off,360); }                   // 5: Scales with beta
+  else if (cs==5) { var off=240, h=scope((180*num*b/pi)+off,360); }                   // 5: Scales with beta
+  return h;
+}
+
 // Log frame rate in console
 function framesPerSecond() {
   let ms=elapsed+(new Date().getTime()-time);
@@ -344,11 +367,10 @@ function framesPerSecond() {
   console.log(count+' cycles, '+ms+'ms ('+fps+'fps)');
 }
 
-// Display histogram of N values
+// Display histograms
 function histogram() {
-  ave=0;
-  if (eval(hist.length)>hl) hl=hist.length;
-  context.save();
+  ave=0; context.save();
+  if (eval(hist[0].length)>hl) hl=hist[0].length;
   if (vw>vh) {
     context.translate(0,vh);
     context.rotate(pi*1.5);
@@ -356,20 +378,93 @@ function histogram() {
   } else {
     var col=vh/hl, bh=vw2;
   }
-  for (i=0; i<hl; i++) if (hist[i]>0) {
-    let hue=(i*7)+90;
-    let bar=Math.sqrt(hist[i]/n)*bh;
-    context.fillStyle='hsla('+hue+',100%,25%,'+(50*o)+'%)';
-    context.fillRect(0,i*col,bar,col);
-    if ((hist[i]>hist[i-1]) && (hist[i]>hist[i+1])) {
+  for (i=0; i<hl; i++) {
+    let N=hist[0][i], L=hist[1][i], R=hist[2][i];
+    let barN=Math.sqrt(N/n)*bh, barL=Math.sqrt(L/n)*bh, barR=Math.sqrt(R/n)*bh;
+    // Draw Ngram
+    context.fillStyle='hsla('+hue(i)+',100%,25%,75%)';
+    context.fillRect(0,i*col,barN,col);
+    if ((hist[0][i]>hist[0][i-1]) && (hist[0][i]>hist[0][i+1])) {
+      // Label peak values
       context.font=(col*2)+'px Roboto';
-      context.fillStyle='hsla('+hue+',50%,50%,'+(50*o)+'%)';
-      context.fillText(i,bar+(col*0.1),(i+1.2)*col);
+      context.fillStyle='hsla('+hue(i)+',50%,50%,50%)';
+      context.fillText(i,barN+(col*0.1),(i+1.2)*col);
     }
+    // Draw Rgram
+    context.fillStyle='rgba(128,0,0,0.25)';
+    context.fillRect(bh/2,i*col,barR,col);
+    // Draw Lgram
+    context.fillStyle='rgba(0,128,128,0.25)';
+    context.fillRect(bh/2,i*col,barL,col);
+  }
+  // Draw scissor scale
+  for (i=0; i<hl; i++) {
+    let L=a+(b*i), R=a-(b*i);
+    L=scope(L+pi,tau)*(bh/(2*tau));
+    R=scope(R+pi,tau)*(bh/(2*tau));
+    context.beginPath();
+    context.moveTo(L,i*col);
+    context.lineTo(L,(i+1)*col);
+    context.strokeStyle='#4AA';
+    context.stroke();
+    context.closePath();
+    context.beginPath();
+    context.moveTo(R,i*col);
+    context.lineTo(R,(i+1)*col);
+    context.strokeStyle='#A44';
+    context.stroke();
+    context.closePath();
   }
   context.restore();
   
   // console.log('Density:'+Math.round(d*z*z*100)/100+'\nAverage N:'+Math.round((ave/n)*100)/100);
+}
+
+// Display orbital diagram
+function orbitals() {
+  let size=Math.min(vw,vh);
+  context.save();
+  if (vw>vh) {
+    context.translate(0,size);
+    context.rotate(pi*1.5);
+  }
+  for (i=-200; i<200; i++) {
+    let ophi=0, ox=(size/2)+(size*0.125*g), oy=size/2;
+    context.strokeStyle='hsla('+hue(Math.abs(i))+',100%,50%,25%)';
+    if (i==0) context.strokeStyle='hsla(0,0%,100%,50%)';
+    if (((i==0) && (a!=0)) || ((i!=0) && (b!=0))) {
+      let os=Math.min(Math.floor(Math.abs(tau/(a+(b*i)))),1000);
+      if (os>1) for (j=0; j<os; j++) {
+        context.beginPath();
+        context.moveTo(ox,oy);
+        ophi+=a+(b*i);
+        ox+=size*0.25*g*Math.cos(ophi);
+        oy+=size*0.25*g*Math.sin(ophi);
+        context.lineTo(ox,oy);
+        context.stroke();
+        context.closePath();
+      }
+    } else if ((a+(b*i))==0) {
+      context.beginPath();
+      context.moveTo(0,oy);
+      context.lineTo(size,oy);
+      context.stroke();
+      context.closePath();
+    }
+  }
+  // Draw particle
+  context.beginPath();
+  context.arc(size/2,size/2,size*s*0.25,0,tau);
+  context.fillStyle='rgba(255,255,255,0.5)';
+  context.fill();
+  context.closePath();
+  // Draw radius
+  context.beginPath();
+  context.arc(size/2,size/2,size*0.25,0,tau);
+  context.strokeStyle='rgba(255,255,255,0.5)';
+  context.stroke();
+  context.closePath();
+  context.restore();
 }
 
 // Cycle through species presets
@@ -394,6 +489,26 @@ function change(id,value) {
   else if (id=='framerate') { window.clearTimeout(run); run=setInterval(step,1000/f); }
 }
 
+// Keyboard inputs
+function keyboard() {
+  let key=event.key, code=event.keyCode;
+  if (key==' ') playPause();                                             // Space:  Play/pause
+  else if (code===13) { species(); refresh(); }                          // Return: Random species
+  else if (key=='r') refresh(0);                                         // R:      Redistribute (random)
+  else if (key=='c') refresh(1);                                         // C:      Redistribute (centre)
+  else if (key=='d') { next(); refresh(); }                              // D:      Next demo
+  else if (key=='a') { if (analyse) analyse=false; else analyse=true; }  // A:      Analyse (histogram) on/off
+  else if (key=='p') { if (ps==0) ps=1; else ps=0; }                     // P:      Particle style (spots or arrows)
+  else if (key=='0') cs=0;                                               // 0:      Colour scheme 0
+  else if (key=='1') cs=1;                                               // 1:      Colour scheme 1
+  else if (key=='2') cs=2;                                               // 2:      Colour scheme 2
+  else if (key=='3') cs=3;                                               // 3:      Colour scheme 3
+  else if (key=='4') cs=4;                                               // 4:      Colour scheme 4
+  else if (key=='5') cs=5;                                               // 5:      Colour scheme 5
+  // else if (key=='')
+  if (paused) step();
+}
+
 // Open a new page using current settings
 function link(env) {
   let href=window.location;
@@ -410,9 +525,7 @@ function link(env) {
 <style>
 * { border:0;  margin:0; padding:0; vertical-align:baseline; -webkit-box-sizing:border-box; -moz-box-sizing:border-box; box-sizing:border-box; }
 body { background:#000; font-family:Roboto; font-weight:200; text-shadow:0 0.1vh 0.2vh #000, 0 0.1vh 0.2vh #000; overflow:hidden; }
-nobr { white-space:nowrap; display:inline-block; }
-#info { cursor:pointer; font-size:calc(7vmin - 2.3vw); line-height:1.75em; color:#AAA; padding:3vh; position:fixed; top:0vmin; left:0vmin; z-index:2; }
-.break { margin-top:calc(4.5vh - 4.5vmin); }
+#info { cursor:pointer; font-size:3vh; line-height:1.75em; color:#FFF; padding:3vh; position:fixed; top:0vmin; left:0vmin; z-index:2; }
 #settings { cursor:pointer; font-size:2.5vh; color:#AAA; padding:3vh; position:fixed; bottom:0vmin; left:0vmin; z-index:3; }
 #controls { padding:4.5vh 0 1.5vh 0; width:45.15vh; height:100vh; background:rgba(48,48,48,0.9); border-left:0.1vh solid #000; text-align:center; position:absolute; top:0; right:-45vh; z-index:2; transition:right 0.25s; }
 #controls:hover { right:0 !important; }
