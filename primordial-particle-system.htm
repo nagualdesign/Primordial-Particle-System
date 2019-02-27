@@ -570,7 +570,7 @@ input[type=button] { margin:0.5vh 0; width:16vh; height:3vh; font-size:1.8vh; cu
       <input id="framerate" type="range" min="5" max="100" step="5" onInput="change(this.id,this.value);" /><br />
       Redistribute<br />
       <input type="button" value="Random" onClick="refresh(0);" />&emsp;<input type="button" value="Centre" onClick="refresh(1);" /></p>
-    <p style="cursor:pointer;" onClick="if (analyse) analyse=false; else analyse=true; if (paused) step();" /><br /><br /><br /></p>
+    <p style="cursor:pointer;" onClick="if (analyse) analyse=false; else analyse=true; if (ps==0) ps=1; else ps=0; if (paused) step();" /><br /><br /><br /></p>
   </div>
 </body>
 </html>
