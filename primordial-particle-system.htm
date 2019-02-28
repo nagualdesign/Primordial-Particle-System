@@ -28,6 +28,7 @@ var vw, vw2, vh, vh2, z, dpr, cw, ch;           // Viewport and HTML canvas
 var r, r2, v, sr, sr2, vwsr4, vhsr4, srdrp;     // Used extensively
 var count, elapsed, time, dist=0, paused=true;  // Simulation parameters
 var hist=new Array(), hl=100, analyse=false;    // Analytics
+var hues=new Array();                           // Look-up table
 
 // Default settings
 var n=600;  // Number of particles (100 to 10,000)
@@ -81,7 +82,7 @@ function species(abg) {
     // Randomize values (3600 × 1800 × 500 = 3.24 billion possible values!)
     a=Math.round(Math.random()*3600)/10-180;  // Alpha (-180.0° to +180.0°)
     b=Math.round(Math.random()*1800)/10-90;   // Beta (-90.0° to +90.0°)
-    g=Math.ceil(Math.random()*500)/1000;   // Gamma (0.001 to 0.500)
+    g=Math.ceil(Math.random()*500)/1000;      // Gamma (0.001 to 0.500)
   } else if (arguments.length==1) {
     // Use preset values
     let pre=preset[abg];
@@ -97,7 +98,14 @@ function species(abg) {
   a=(a/360)*tau, b=(b/360)*tau;
   
   // Update user interface
-  sliders(); showabg();
+  showabg(); sliders();
+}
+
+// Display current settings
+function showabg() {
+  document.getElementById("info").innerHTML='<h1>'+caption+'</h1>';
+  let sHTML='α&thinsp;'+Math.round((a/pi)*1800)/10+'°&emsp;β&thinsp;'+Math.round((b/pi)*1800)/10+'°&emsp;γ&thinsp;'+Math.round(g*1000)/1000;
+  document.getElementById("settings").innerHTML=sHTML;
 }
 
 // Apply settings to control sliders
@@ -113,13 +121,6 @@ function sliders() {
   document.getElementById("trails").value=1-o;
   document.getElementById("framerate").value=f;
   document.getElementById("rate").innerHTML=f;
-}
-
-// Display current settings
-function showabg() {
-  document.getElementById("info").innerHTML=caption;
-  let sHTML='α&thinsp;'+Math.round((a/pi)*1800)/10+'°&emsp;β&thinsp;'+Math.round((b/pi)*1800)/10+'°&emsp;γ&thinsp;'+g;
-  document.getElementById("settings").innerHTML=sHTML;
 }
 
 // Begin new simulation
@@ -140,7 +141,7 @@ function playPause() {
     // Play simulation
     paused=false;
     time=new Date().getTime();
-    document.getElementById("controls").style.right='-45vh';
+    document.getElementById("controls").style.right='-44vh';
     run=setInterval(step,1000/f);
   } else {
     // Pause simulation
@@ -204,8 +205,8 @@ function setvr() {
 
 // Advance simulation by one step (this function is called f times per second)
 function step() {
+  count++;
   if (analyse) {
-    count++;              // Number of iterations
     hl-=0.005*(hl-100);   // Gradually shorten histograms
     hist[0]=new Array();  // Number of neighbours (N)
     hist[1]=new Array();  // Neighbours on left (L)
@@ -239,8 +240,8 @@ function step() {
     for (yg=0; yg<yCells; yg++) {                             // Step through the grid cells (top to bottom)
       for (gp=0; gp<grid[xg][yg].length; gp++) {		          // Step through the particles in each grid
         let i=grid[xg][yg][gp];                               // Now we have a particle index and we're already in the right grid
-        for (xc=xg-1; xc<xg+2; xc++) {                        // Iterate through the 9 neighbour cells (left to right)
-          for (yc=yg-1; yc<yg+2; yc++) {                      // Iterate through the 9 neighbour cells (top to bottom)
+        for (xc=xg-1; xc<=xg+1; xc++) {                       // Iterate through the 9 neighbour cells (left to right)
+          for (yc=yg-1; yc<=yg+1; yc++) {                     // Iterate through the 9 neighbour cells (top to bottom)
             let sxc=scope(xc,xCells), syc=scope(yc,yCells);   // Wrap screen edges, Pac-Man style
             for (jp=0; jp<grid[sxc][syc].length; jp++) {      // Iterate through the particles in each cell			
               let j=grid[sxc][syc][jp];                       // Finally we have both i & j
@@ -273,17 +274,16 @@ function step() {
       // Draw vectors (arrows)
       context.beginPath();
       context.moveTo(p[i].x,p[i].y);
-      context.lineTo(p[i].x+(v*Math.cos(p[i].phi)),p[i].y+(v*Math.sin(p[i].phi)));
-      context.lineTo(p[i].x+(v*Math.cos(p[i].phi))+((v*0.25+4)*Math.cos(p[i].phi+3.5)),p[i].y+(v*Math.sin(p[i].phi))+((v*0.25+4)*Math.sin(p[i].phi+3.5)));
-      context.moveTo(p[i].x+(v*Math.cos(p[i].phi)),p[i].y+(v*Math.sin(p[i].phi)));
-      context.lineTo(p[i].x+(v*Math.cos(p[i].phi))+((v*0.25+4)*Math.cos(p[i].phi-3.5)),p[i].y+(v*Math.sin(p[i].phi))+((v*0.25+4)*Math.sin(p[i].phi-3.5)));
+      context.lineTo(p[i].x+(v*p[i].pCos),p[i].y+(v*p[i].pSin));
+      context.moveTo(p[i].x+(v*p[i].pCos)+((v*0.25+4)*Math.cos(p[i].phi+3.5)),p[i].y+(v*p[i].pSin)+((v*0.25+4)*Math.sin(p[i].phi+3.5)));
+      context.lineTo(p[i].x+(v*p[i].pCos),p[i].y+(v*p[i].pSin));
+      context.lineTo(p[i].x+(v*p[i].pCos)+((v*0.25+4)*Math.cos(p[i].phi-3.5)),p[i].y+(v*p[i].pSin)+((v*0.25+4)*Math.sin(p[i].phi-3.5)));
       context.strokeStyle='hsl('+hue(p[i].N)+',100%,50%)';
       context.stroke();
       context.fillStyle='#FFF';
       context.fillRect(p[i].x-1,p[i].y-1,2,2);
       context.closePath();
     } else {
-      // Draw particles
       if (srdpr>2) {
         // Draw a circle
         context.beginPath();
@@ -343,21 +343,25 @@ function step() {
 
 // Ensure values are between 0 and max
 function scope(val,max) {
-  if (val>=max) val=val%max;
-  else if (val<0) val=max+(val%max);
+  val%=max;
+  if (val<0) val+=max;
   return val;
 }
 
 // Select hue based on number of neighbours and colour scheme
 function hue(num) {
-  if (cs==0) { var h=90; }                                                            // 0: Grayscale (green screen)
-  else if (cs==1) { var mult=7.2, off=90, h=scope((num*mult)+off,360); }              // 1: Short scale (wraps at N=50, N=100, N=150.. )
-  else if (cs==2) { var mult=1, off=90, h=scope((num*mult)+off,360); }                // 2: Long scale (wraps at N=360, N=720, N=1080...)
-  else if (cs==3) { var off=90, h=scope(Math.round(Math.log(num)*156.34)+off,360); }  // 3: Log scale (wraps at N=10, N=100, N=1000...)
-  else if (cs==4) { var mult=60/d, off=90, h=scope((num*mult)+off,360); }             // 4: Scales with density (same as short scale @ d=8)
-  else if (cs==5) { var off=240, h=scope((180*num*b/pi)+off,360); }                   // 5: Scales with beta
-  else if (cs==5) { var off=240, h=scope((180*num*b/pi)+off,360); }                   // 5: Scales with beta
-  return h;
+  if (hues[cs]===undefined) hues[cs]=new Array();
+  if (hues[cs][num]===undefined) {
+    // Build look-up tables
+    if (cs==0) hues[cs][num]=90;                                                      // 0: Monochrome (green screen)
+    else if (cs==1) hues[cs][num]=scope((num*7.2)+90,360);                            // 1: Short scale (wraps at N=50, N=100, N=150.. )
+    else if (cs==2) hues[cs][num]=scope((num*2)+90,360);                              // 2: Medium scale (wraps at N=180, N=360, N=540...)
+    else if (cs==3) hues[cs][num]=scope(num+90,360);                                  // 3: Long scale (wraps at N=360, N=720, N=1080...)
+    else if (cs==4) hues[cs][num]=scope((Math.max(Math.log(num),-5)*156.34)+90,360);  // 4: Log scale (wraps at N=1, N=10, N=100, N=1000...)
+    else if (cs==5) hues[cs][num]=scope((num*60/d)+90,360);                           // 5: Scales with density
+    else if (cs==6) hues[cs][num]=scope((num*b*180/pi)+240,360);                      // 6: Scales with beta
+  }
+  return hues[cs][num];
 }
 
 // Log frame rate in console
@@ -384,7 +388,7 @@ function histogram() {
     // Draw Ngram
     context.fillStyle='hsla('+hue(i)+',100%,25%,75%)';
     context.fillRect(0,i*col,barN,col);
-    if ((hist[0][i]>hist[0][i-1]) && (hist[0][i]>hist[0][i+1])) {
+    if ((hist[0][i]>hist[0][i-1]) && (hist[0][i]>hist[0][i+1]) && (col>4)) {
       // Label peak values
       context.font=(col*2)+'px Roboto';
       context.fillStyle='hsla('+hue(i)+',50%,50%,50%)';
@@ -396,10 +400,9 @@ function histogram() {
     // Draw Lgram
     context.fillStyle='rgba(0,128,128,0.25)';
     context.fillRect(bh/2,i*col,barL,col);
-  }
-  // Draw scissor scale
-  for (i=0; i<hl; i++) {
-    let L=a+(b*i), R=a-(b*i);
+    
+    // Draw scissor scale
+    L=a+(b*i), R=a-(b*i);
     L=scope(L+pi,tau)*(bh/(2*tau));
     R=scope(R+pi,tau)*(bh/(2*tau));
     context.beginPath();
@@ -416,8 +419,6 @@ function histogram() {
     context.closePath();
   }
   context.restore();
-  
-  // console.log('Density:'+Math.round(d*z*z*100)/100+'\nAverage N:'+Math.round((ave/n)*100)/100);
 }
 
 // Display orbital diagram
@@ -469,21 +470,21 @@ function orbitals() {
 
 // Cycle through species presets
 function next() {
-  demo++;
-  if (demo==preset.length) demo=0;
+  demo=scope(demo+1,preset.length);
   species(demo);
 }
 
 // Apply control panel settings (user inputs)
 function change(id,value) {
+  value=eval(value);
   if (id=='alpha') a=(value/180)*pi;
   else if (id=='beta') b=(value/180)*pi;
   else if (id=='gamma') { g=value, v=g*r; }
-  else if (id=='number') { n=value; setvr(); document.getElementById("num").innerHTML=n; }
-  else if (id=='density') { d=value; scale; setvr(); document.getElementById("den").innerHTML=Math.round(d*z*z*100)/100; }
+  else if (id=='number') { n=value; setvr(); sliders(); }
+  else if (id=='density') { d=value; scale; setvr(); sliders(); }
   else if (id=='trails') o=1-value;
-  else if (id=='size') s=value, sr=s*r, sr2=sr*2, sr4=sr*4, vwsr4=vw+sr4, vhsr4=vh+sr4, srdpr=sr*dpr;
-  else if (id=='framerate') { f=value; document.getElementById("rate").innerHTML=f; }
+  else if (id=='size') { s=value; setvr(); }
+  else if (id=='framerate') { f=value; sliders(); }
   if ((id=='alpha') || (id=='beta') || (id=='gamma')) { caption='&emsp;'; showabg(); }
   if (paused) step();
   else if (id=='framerate') { window.clearTimeout(run); run=setInterval(step,1000/f); }
@@ -491,13 +492,23 @@ function change(id,value) {
 
 // Keyboard inputs
 function keyboard() {
-  let key=event.key, code=event.keyCode;
+  let key=event.key, code=event.keyCode, valid=true;
   if (key==' ') playPause();                                             // Space:  Play/pause
   else if (code===13) { species(); refresh(); }                          // Return: Random species
+  else if (key=='[') { a=Math.max(a-pi/1800,-pi); caption='&emsp;'; }    // [:      Decrease alpha
+  else if (key==']') { a=Math.min(a+pi/1800,pi); caption='&emsp;'; }     // ]:      Increase alpha
+  else if (key==';') { b=Math.max(b-pi/1800,-pi/2); caption='&emsp;'; }  // ;:      Decrease beta
+  else if (key=='\'') { b=Math.min(b+pi/1800,pi/2); caption='&emsp;'; }  // ':      Increase beta
+  else if (key==',') { if (g>0.001) g-=0.001, caption='&emsp;'; }        // ,:      Decrease gamma
+  else if (key=='.') { if (g<0.5) g+=0.001, caption='&emsp;'; }          // .:      Increase gamma
+  else if (key=='-') { if (n>100) { n-=100; setvr(); }}                  // -:      Less particles
+  else if (key=='+') { if (n<10000) { n+=100; setvr(); }}                // +:      More particles
+  else if (key=='/') { if (d>1) { d-=1; setvr(); }}                      // /:      Decrease density
+  else if (key=='*') { if (d<100) { d+=1; setvr(); }}                    // *:      Increase density
   else if (key=='r') refresh(0);                                         // R:      Redistribute (random)
   else if (key=='c') refresh(1);                                         // C:      Redistribute (centre)
   else if (key=='d') { next(); refresh(); }                              // D:      Next demo
-  else if (key=='a') { if (analyse) analyse=false; else analyse=true; }  // A:      Analyse (histogram) on/off
+  else if (key=='a') { if (analyse) analyse=false; else analyse=true; }  // A:      Analyse (histograms) on/off
   else if (key=='p') { if (ps==0) ps=1; else ps=0; }                     // P:      Particle style (spots or arrows)
   else if (key=='0') cs=0;                                               // 0:      Colour scheme 0
   else if (key=='1') cs=1;                                               // 1:      Colour scheme 1
@@ -505,8 +516,29 @@ function keyboard() {
   else if (key=='3') cs=3;                                               // 3:      Colour scheme 3
   else if (key=='4') cs=4;                                               // 4:      Colour scheme 4
   else if (key=='5') cs=5;                                               // 5:      Colour scheme 5
-  // else if (key=='')
-  if (paused) step();
+  else if (key=='6') cs=6;                                               // 6:      Colour scheme 6
+  else valid=false;
+  if (!valid) {
+    if (document.getElementById("info").innerHTML.startsWith('<h1>Keyboard shortcuts:</h1>')) showabg();
+    else {
+      // Display keyboard shortcuts
+      let shortcuts='<b>Space</b> .. Pause/play<br />';
+      shortcuts+='<b>Enter</b> .... Randomize species<br />';
+      shortcuts+='<b>[&ensp;]</b>&thinsp; ......... Decrease/increase alpha<br />';
+      shortcuts+='<b>;&ensp;\'</b> .......... Decrease/increase beta<br />';
+      shortcuts+='<b>,&ensp;.</b> .......... Decrease/increase gamma<br />';
+      shortcuts+='<b>-&ensp;+</b> ........ Less/more particles<br />';
+      shortcuts+='<b>/&ensp;*</b> ........ Decrease/increase density<br />';
+      shortcuts+='<b>R</b> ........... Redistribute (random)<br />';
+      shortcuts+='<b>C</b> ........... Redistribute (centre)<br />';
+      shortcuts+='<b>D</b> ........... Next demo<br />';
+      shortcuts+='<b>A</b> ........... Analysis on/off<br />';
+      shortcuts+='<b>P</b> ........... Particle style<br />';
+      shortcuts+='<b>0-6</b> ........ Colour scheme';
+      document.getElementById("info").innerHTML='<h1>Keyboard shortcuts:</h1><br /><p>'+shortcuts+'</p>';
+    }
+  }
+  else { showabg(); sliders(); if (paused) step(); }
 }
 
 // Open a new page using current settings
@@ -525,15 +557,15 @@ function link(env) {
 <style>
 * { border:0;  margin:0; padding:0; vertical-align:baseline; -webkit-box-sizing:border-box; -moz-box-sizing:border-box; box-sizing:border-box; }
 body { background:#000; font-family:Roboto; font-weight:200; text-shadow:0 0.1vh 0.2vh #000, 0 0.1vh 0.2vh #000; overflow:hidden; }
-#info { cursor:pointer; font-size:3vh; line-height:1.75em; color:#FFF; padding:3vh; position:fixed; top:0vmin; left:0vmin; z-index:2; }
-#settings { cursor:pointer; font-size:2.5vh; color:#AAA; padding:3vh; position:fixed; bottom:0vmin; left:0vmin; z-index:3; }
-#controls { padding:4.5vh 0 1.5vh 0; width:45.15vh; height:100vh; background:rgba(48,48,48,0.9); border-left:0.1vh solid #000; text-align:center; position:absolute; top:0; right:-45vh; z-index:2; transition:right 0.25s; }
+#info { cursor:pointer; padding:4vh; position:fixed; top:0vmin; left:0vmin; z-index:2; }
+#settings { cursor:pointer; font-size:2.5vh; color:#AAA; padding:4vh; position:fixed; bottom:0vmin; left:0vmin; z-index:3; }
+#controls { padding:4vh 0; width:44.15vh; height:100vh; background:rgba(48,48,48,0.9); border-left:0.1vh solid #000; text-align:center; position:absolute; top:0; right:-44vh; z-index:2; transition:right 0.25s; }
 #controls:hover { right:0 !important; }
-#controls h1 { font-size:3vh; font-weight:normal; color:#FFF; line-height:1; cursor:pointer; }
-#controls h2 { margin:2.5vh 0 1vh 0; font-size:2.5vh; font-weight:normal; color:#FFF; cursor:pointer; }
-#controls p { margin-bottom:3vmin; font-size:1.8vh; color:#CCC; line-height:1.5; }
-#controls p a { color:#EEE; text-decoration:none; }
-#controls p a:hover { color:#FFF; }
+h1 { font-size:3vh; font-weight:normal; color:#FFF; line-height:1; }
+h2 { margin:2.5vh 0 1vh 0; font-size:2.5vh; font-weight:normal; color:#FFF; cursor:pointer; }
+p { margin-bottom:3vmin; font-size:1.8vh; color:#CCC; line-height:1.5; }
+a { color:#EEE; text-decoration:none; }
+a:hover { color:#FFF; }
 input[type=range] { margin:0.75vh 0; width:34vh; height:2vh; cursor:pointer; }
 input[type=button] { margin:0.5vh 0; width:16vh; height:3vh; font-size:1.8vh; cursor:pointer; }
 </style>
@@ -543,13 +575,13 @@ input[type=button] { margin:0.5vh 0; width:16vh; height:3vh; font-size:1.8vh; cu
   <canvas id="canvas" onClick="playPause();"></canvas>
   <div id="info" onClick="next(); refresh();"></div>
   <div id="settings" onClick="species(); refresh();"></div>
-  <div id="controls" onMouseOver="this.style.right='-45vh';">
+  <div id="controls" onMouseOver="this.style.right='-44vh';">
     <h1>Primordial Particle System</h1>
     <p>by Joe Haythornthwaite & Adam Wilkinson</p>
     <p>Based on the <a href="http://zool33.uni-graz.at/artlife/PPS" target="graz">Primordial Particle System</a><br/>
       Originally developed at Graz University<br />
       by Thomas Schmickl & Martin Stefanec<br />
-      <a href="https://www.youtube.com/watch?v=makaJpLvbow" target="youtube">&nbsp;»&thinsp;Watch the YouTube video&thinsp;«&nbsp;</a></p>
+      <a href="https://www.youtube.com/watch?v=makaJpLvbow" target="youtube">»&thinsp;Watch the YouTube video&thinsp;«</a></p>
     <h2 onClick="link(0);">Species parameters</h2>
     <p>Alpha (intrinsic turning angle)<br />
       <input id="alpha" type="range" min="-180" max="180" step="0.1" onInput="change(this.id,this.value);" /><br />
@@ -570,7 +602,7 @@ input[type=button] { margin:0.5vh 0; width:16vh; height:3vh; font-size:1.8vh; cu
       <input id="framerate" type="range" min="5" max="100" step="5" onInput="change(this.id,this.value);" /><br />
       Redistribute<br />
       <input type="button" value="Random" onClick="refresh(0);" />&emsp;<input type="button" value="Centre" onClick="refresh(1);" /></p>
-    <p style="cursor:pointer;" onClick="if (analyse) analyse=false; else analyse=true; if (ps==0) ps=1; else ps=0; if (paused) step();" /><br /><br /><br /></p>
+    <p style="cursor:pointer;" onClick="if (analyse) analyse=false, ps=1; else analyse=true, ps=0; if (paused) step();" /><br /><br /><br /></p>
   </div>
 </body>
 </html>
